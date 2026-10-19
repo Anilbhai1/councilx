@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Council X | The Syndicate",
+    "slug": "council-x-the-syndicate",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#050505",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.councilx.syndicate"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#050505"
+      },
+      "package": "com.councilx.syndicate"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
