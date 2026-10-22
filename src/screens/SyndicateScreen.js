@@ -529,6 +529,11 @@ export default function SyndicateScreen({ route, navigation }) {
 
       <PaywallModal
         visible={paywallVisible}
+        navigation={navigation}
+        onOpenPricing={() => {
+          setPaywallVisible(false);
+          navigation.navigate('Pricing');
+        }}
         onClose={() => setPaywallVisible(false)}
         onSuccess={async () => {
           setPaywallVisible(false);

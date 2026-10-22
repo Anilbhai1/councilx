@@ -558,9 +558,14 @@ export default function ChatScreen({ route, navigation }) {
         onClose={() => setSelectedQuote(null)}
       />
 
-      {/* 3-Tier Paywall Modal */}
+      {/* Subscription Paywall Modal */}
       <PaywallModal
         visible={paywallVisible}
+        navigation={navigation}
+        onOpenPricing={() => {
+          setPaywallVisible(false);
+          navigation.navigate('Pricing');
+        }}
         onClose={() => setPaywallVisible(false)}
         onSuccess={async () => {
           setPaywallVisible(false);

@@ -15,6 +15,8 @@ import DebateScreen from '../screens/DebateScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import LegalComplianceScreen from '../screens/LegalComplianceScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import PricingScreen from '../screens/PricingScreen';
+import PremiumSuccessScreen from '../screens/PremiumSuccessScreen';
 import { COLORS } from '../theme/colors';
 import { getLocalSession, clearLocalSession } from '../services/supabaseClient';
 
@@ -25,10 +27,10 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     typeof initialAuth === 'boolean' ? initialAuth : null
   );
 
-  // Dedicated Clean /admin Route & Deep-Link Listener
+  // Dedicated Clean /admin, /pricing & /success Route & Deep-Link Listener
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const checkAdminRoute = () => {
+      const checkRoute = () => {
         const path = (window.location.pathname || '').toLowerCase();
         const search = (window.location.search || '').toLowerCase();
         const hash = (window.location.hash || '').toLowerCase();
@@ -39,21 +41,48 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
           hash.includes('admin')
         ) {
           setCurrentScreen('Admin');
+        } else if (
+          path === '/pricing' ||
+          path.startsWith('/pricing') ||
+          path === '/subscription' ||
+          path.startsWith('/subscription') ||
+          search.includes('pricing') ||
+          hash.includes('pricing')
+        ) {
+          setCurrentScreen('Pricing');
+        } else if (
+          path === '/success' ||
+          path.startsWith('/success') ||
+          path === '/premium-success' ||
+          path.startsWith('/premium-success') ||
+          search.includes('success') ||
+          hash.includes('success')
+        ) {
+          setCurrentScreen('PremiumSuccess');
         }
       };
 
-      checkAdminRoute();
+      checkRoute();
 
-      window.addEventListener('popstate', checkAdminRoute);
+      window.addEventListener('popstate', checkRoute);
 
-      // Backdoor console helper for web developers
+      // Backdoor console helpers for web developers
       window.__councilx_open_admin = () => {
         setCurrentScreen('Admin');
         window.history.pushState(null, '', '/admin');
       };
+      window.__councilx_open_pricing = () => {
+        setCurrentScreen('Pricing');
+        window.history.pushState(null, '', '/pricing');
+      };
+      window.__councilx_open_success = (params = {}) => {
+        setScreenParams(params);
+        setCurrentScreen('PremiumSuccess');
+        window.history.pushState(null, '', '/success');
+      };
 
       return () => {
-        window.removeEventListener('popstate', checkAdminRoute);
+        window.removeEventListener('popstate', checkRoute);
       };
     }
   }, []);
@@ -88,6 +117,10 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         if (screenName === 'Admin') {
           window.history.pushState(null, '', '/admin');
+        } else if (screenName === 'Pricing') {
+          window.history.pushState(null, '', '/pricing');
+        } else if (screenName === 'PremiumSuccess') {
+          window.history.pushState(null, '', '/success');
         } else if (screenName === 'Home') {
           window.history.pushState(null, '', '/');
         }
@@ -130,6 +163,24 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     );
   }
 
+  // Dedicated Pricing Screen: Accessible directly or via /pricing route
+  if (currentScreen === 'Pricing') {
+    return (
+      <View style={styles.container}>
+        <PricingScreen route={{ params: screenParams }} navigation={navigation} />
+      </View>
+    );
+  }
+
+  // Dedicated Premium Success Screen: Accessible after payment or via /success route
+  if (currentScreen === 'PremiumSuccess') {
+    return (
+      <View style={styles.container}>
+        <PremiumSuccessScreen route={{ params: screenParams }} navigation={navigation} />
+      </View>
+    );
+  }
+
   if (isAuthenticated === null) {
     return (
       <View style={styles.loadingBox}>
@@ -152,6 +203,10 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
 
   const renderCurrentScreen = () => {
     switch (currentScreen) {
+      case 'PremiumSuccess':
+        return <PremiumSuccessScreen route={{ params: screenParams }} navigation={navigation} />;
+      case 'Pricing':
+        return <PricingScreen route={{ params: screenParams }} navigation={navigation} />;
       case 'Admin':
         return <AdminDashboardScreen navigation={navigation} />;
       case 'Auth':

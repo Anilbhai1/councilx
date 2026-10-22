@@ -18,6 +18,7 @@ export default function Header({
   onOpenReferral,
   onOpenSettings,
   onOpenPaywall,
+  onOpenPricing,
   onOpenProfile,
   title = 'COUNCIL X'
 }) {
@@ -61,7 +62,10 @@ export default function Header({
           {/* Quota / Pro Pill */}
           <TouchableOpacity
             style={[styles.statusBadge, isPremium ? styles.proBadge : styles.freeBadge]}
-            onPress={isPremium ? null : onOpenPaywall}
+            onPress={() => {
+              if (onOpenPricing) onOpenPricing();
+              else if (onOpenPaywall) onOpenPaywall();
+            }}
             activeOpacity={0.8}
           >
             <Ionicons

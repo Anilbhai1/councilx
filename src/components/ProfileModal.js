@@ -32,7 +32,7 @@ import { useLanguage } from '../utils/i18n';
 import TermsModal from './TermsModal';
 import LanguageModal from './LanguageModal';
 
-export default function ProfileModal({ visible, onClose, onOpenPaywall, onLogout }) {
+export default function ProfileModal({ visible, onClose, onOpenPaywall, onOpenPricing, navigation, onLogout }) {
   const { t, lang, changeLanguage, languages, languageMeta } = useLanguage();
   const [userStatus, setUserStatus] = useState(null);
   const [userEmail, setUserEmail] = useState('');
@@ -286,26 +286,26 @@ export default function ProfileModal({ visible, onClose, onOpenPaywall, onLogout
 
                   {/* All Subscription Plans Display - Directly Purchasable & Interactive */}
                   <View style={styles.planSummaryList}>
-                    {/* 1-Month Plan */}
+                    {/* 1. 108 Bharat Vishwaguru */}
                     <TouchableOpacity
                       style={[
                         styles.planMiniCard,
-                        selectedPlanKey === '1_month' && styles.selectedPlanMiniCard
+                        selectedPlanKey === '108_bharat' && styles.selectedPlanMiniCard
                       ]}
-                      onPress={() => setSelectedPlanKey('1_month')}
+                      onPress={() => setSelectedPlanKey('108_bharat')}
                       activeOpacity={0.88}
                     >
                       <View style={styles.planMiniHeader}>
                         <View style={{ flex: 1 }}>
-                          <Text style={styles.planMiniName}>1-Month Pro Plan</Text>
-                          <Text style={styles.planMiniPerk}>30 Days • Up to 15 Custom Agents</Text>
+                          <Text style={styles.planMiniName}>108 Bharat Vishwaguru</Text>
+                          <Text style={styles.planMiniPerk}>50 Inquiries/mo • 108 Legends • 5 Personal Thinkers</Text>
                         </View>
                         <Text style={styles.planMiniPrice}>₹499</Text>
                         <TouchableOpacity
                           style={styles.buyPlanMiniBtn}
                           onPress={() => {
                             onClose();
-                            onOpenPaywall?.('1_month');
+                            onOpenPaywall?.('108_bharat');
                           }}
                           activeOpacity={0.85}
                         >
@@ -316,63 +316,33 @@ export default function ProfileModal({ visible, onClose, onOpenPaywall, onLogout
                       </View>
                     </TouchableOpacity>
 
-                    {/* 6-Month Plan */}
-                    <TouchableOpacity
-                      style={[
-                        styles.planMiniCard,
-                        selectedPlanKey === '6_month' && styles.selectedPlanMiniCard
-                      ]}
-                      onPress={() => setSelectedPlanKey('6_month')}
-                      activeOpacity={0.88}
-                    >
-                      <View style={styles.planMiniHeader}>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.planMiniName}>6-Month Pro Plan (Save 33%)</Text>
-                          <Text style={styles.planMiniPerk}>180 Days • Up to 50 Custom Agents</Text>
-                        </View>
-                        <Text style={styles.planMiniPrice}>₹1,999</Text>
-                        <TouchableOpacity
-                          style={styles.buyPlanMiniBtn}
-                          onPress={() => {
-                            onClose();
-                            onOpenPaywall?.('6_month');
-                          }}
-                          activeOpacity={0.85}
-                        >
-                          <Text style={styles.buyPlanMiniBtnText}>
-                            {lang === 'gu' ? 'ખરીદો' : 'Buy'}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* 1-Year Plan */}
+                    {/* 2. 216 Supreme Syndicate (All-in-One Sovereign) */}
                     <TouchableOpacity
                       style={[
                         styles.planMiniCard,
                         styles.planMiniCardAnnual,
-                        selectedPlanKey === '1_year' && styles.selectedPlanMiniCard
+                        (selectedPlanKey === '216_syndicate' || selectedPlanKey === '1_year') && styles.selectedPlanMiniCard
                       ]}
-                      onPress={() => setSelectedPlanKey('1_year')}
+                      onPress={() => setSelectedPlanKey('216_syndicate')}
                       activeOpacity={0.88}
                     >
                       <View style={styles.planMiniHeader}>
                         <View style={{ flex: 1 }}>
-                          <Text style={[styles.planMiniName, { color: '#FFFFFF', fontWeight: '900' }]}>
-                            1-Year Annual Pro Plan (Best Value)
+                          <Text style={[styles.planMiniName, { color: '#F59E0B', fontWeight: '900' }]}>
+                            216 Supreme Syndicate (All-in-One)
                           </Text>
-                          <Text style={styles.planMiniPerk}>365 Days • UNLIMITED Custom Agents</Text>
+                          <Text style={styles.planMiniPerk}>UNLIMITED Consults • 216 Maha-Saba Council • Debates</Text>
                         </View>
-                        <Text style={[styles.planMiniPrice, { color: '#FFFFFF' }]}>₹3,499</Text>
+                        <Text style={[styles.planMiniPrice, { color: '#F59E0B' }]}>₹1,999</Text>
                         <TouchableOpacity
-                          style={styles.buyPlanMiniBtn}
+                          style={[styles.buyPlanMiniBtn, { backgroundColor: '#F59E0B' }]}
                           onPress={() => {
                             onClose();
-                            onOpenPaywall?.('1_year');
+                            onOpenPaywall?.('216_syndicate');
                           }}
                           activeOpacity={0.85}
                         >
-                          <Text style={styles.buyPlanMiniBtnText}>
+                          <Text style={[styles.buyPlanMiniBtnText, { color: '#000000' }]}>
                             {lang === 'gu' ? 'ખરીદો' : 'Buy'}
                           </Text>
                         </TouchableOpacity>
@@ -428,6 +398,24 @@ export default function ProfileModal({ visible, onClose, onOpenPaywall, onLogout
                       {userStatus?.isExpired
                         ? `${t('renewPlanBtn', 'RENEW PRO PLAN')} (${selectedPlanKey === '1_month' ? '₹499' : selectedPlanKey === '6_month' ? '₹1,999' : '₹3,499'})`
                         : `${t('buyPlanBtn', 'UPGRADE PLAN')} (${selectedPlanKey === '1_month' ? '₹499' : selectedPlanKey === '6_month' ? '₹1,999' : '₹3,499'})`}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.fullPricingBtn}
+                    onPress={() => {
+                      onClose();
+                      if (onOpenPricing) onOpenPricing();
+                      else if (navigation?.navigate) navigation.navigate('Pricing');
+                      else onOpenPaywall?.('premium_mastermind');
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <Ionicons name="card-outline" size={14} color="#FFFFFF" />
+                    <Text style={styles.fullPricingBtnText}>
+                      {lang === 'gu'
+                        ? 'સંપૂર્ણ પ્લાન અને પેમેન્ટ (Razorpay / Stripe) જુઓ'
+                        : 'View Full Pricing & Payment Gateways (Razorpay / Stripe)'}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1140,5 +1128,22 @@ const styles = StyleSheet.create({
     color: '#666666',
     fontSize: 11,
     fontWeight: '600',
+  },
+  fullPricingBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+    borderRadius: 10,
+    paddingVertical: 11,
+    marginTop: 10,
+  },
+  fullPricingBtnText: {
+    color: '#E5E7EB',
+    fontSize: 11.5,
+    fontWeight: '700',
   },
 });

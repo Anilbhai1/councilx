@@ -235,6 +235,11 @@ export default function DebateScreen({ navigation }) {
       {/* Paywall */}
       <PaywallModal
         visible={paywallVisible}
+        navigation={navigation}
+        onOpenPricing={() => {
+          setPaywallVisible(false);
+          navigation.navigate('Pricing');
+        }}
         onClose={() => setPaywallVisible(false)}
         onSuccess={() => setPaywallVisible(false)}
       />

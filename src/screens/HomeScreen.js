@@ -280,7 +280,8 @@ export default function HomeScreen({ navigation }) {
           remainingFree={userStatus.remainingFree}
           onOpenSupremeCouncil={() => navigation.navigate('Syndicate')}
           onOpenReferral={() => setReferralModalVisible(true)}
-          onOpenPaywall={() => setPaywallVisible(true)}
+          onOpenPricing={() => navigation.navigate('Pricing')}
+          onOpenPaywall={() => navigation.navigate('Pricing')}
           onOpenProfile={() => setProfileModalVisible(true)}
           onOpenHistory={() => navigation.navigate('History')}
           onOpenSettings={() => setProfileModalVisible(true)}
@@ -426,6 +427,11 @@ export default function HomeScreen({ navigation }) {
       {/* Profile & Settings Modal */}
       <ProfileModal
         visible={profileModalVisible}
+        navigation={navigation}
+        onOpenPricing={() => {
+          setProfileModalVisible(false);
+          navigation.navigate('Pricing');
+        }}
         onClose={() => {
           setProfileModalVisible(false);
           loadUserStatus();
@@ -444,10 +450,15 @@ export default function HomeScreen({ navigation }) {
         }}
       />
 
-      {/* 3-Tier Paywall Modal */}
+      {/* Subscription Paywall Modal */}
       <PaywallModal
         visible={paywallVisible}
         initialPlanKey={paywallPlan}
+        navigation={navigation}
+        onOpenPricing={() => {
+          setPaywallVisible(false);
+          navigation.navigate('Pricing');
+        }}
         onClose={() => setPaywallVisible(false)}
         onSuccess={async () => {
           setPaywallVisible(false);
