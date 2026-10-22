@@ -15,7 +15,9 @@
 
 import { i18n, getFullLanguageName } from '../utils/i18n';
 
-const getApiKey = () => process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
+// Gemini requests go through the server-side /api/gemini Netlify Function so the
+// API key never ships in the client bundle. Native builds can point at the deployed site.
+const GEMINI_PROXY_URL = `${process.env.EXPO_PUBLIC_API_BASE_URL || ''}/api/gemini`;
 
 const MODEL_CASCADES = {
   flash: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
@@ -49,11 +51,6 @@ const DEPTH_CONFIGS = {
  * Universal Gemini API Cascade Caller
  */
 async function executeGeminiCascade({ systemInstruction, contents, modelType = 'flash', thinkingDepth = 'medium' }) {
-  const apiKey = getApiKey();
-  if (!apiKey || apiKey.includes('your_gemini_api_key')) {
-    throw new Error('Gemini API key is not configured');
-  }
-
   const depthSetting = DEPTH_CONFIGS[thinkingDepth] || DEPTH_CONFIGS.medium;
   const modelsToTry = MODEL_CASCADES[modelType] || MODEL_CASCADES.flash;
 
@@ -66,7 +63,6 @@ async function executeGeminiCascade({ systemInstruction, contents, modelType = '
   let lastError = null;
 
   for (const model of modelsToTry) {
-    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
     // Attempt 1: With Official Google Search Grounding (Live Web & YouTube Intelligence)
     try {
@@ -77,10 +73,10 @@ async function executeGeminiCascade({ systemInstruction, contents, modelType = '
         generationConfig: baseConfig
       };
 
-      const resp = await fetch(endpoint, {
+      const resp = await fetch(GEMINI_PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadWithTools)
+        body: JSON.stringify({ model, payload: payloadWithTools })
       });
 
       if (resp.ok) {
@@ -103,10 +99,10 @@ async function executeGeminiCascade({ systemInstruction, contents, modelType = '
         generationConfig: baseConfig
       };
 
-      const resp = await fetch(endpoint, {
+      const resp = await fetch(GEMINI_PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadWithoutTools)
+        body: JSON.stringify({ model, payload: payloadWithoutTools })
       });
 
       if (resp.ok) {
@@ -130,8 +126,8 @@ async function executeGeminiCascade({ systemInstruction, contents, modelType = '
 
 export const geminiService = {
   isConfigured() {
-    const key = getApiKey();
-    return Boolean(key && !key.includes('your_gemini_api_key'));
+    // The key lives server-side; if it is missing the proxy errors and callers fall back.
+    return true;
   },
 
   /**
