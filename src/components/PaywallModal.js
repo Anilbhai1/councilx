@@ -1,1183 +1,1333 @@
 /**
  * COUNCIL X | THE SYNDICATE
- * 3-Tier Razorpay Paywall Modal & Built-In Razorpay Secure Checkout
- * 
- * Plans:
- * 1. 1-Month Pro Plan: ₹499 (30 Days)
- * 2. 6-Month Pro Plan: ₹1,999 (180 Days, SAVE 33% DISCOUNT)
- * 3. 1-Year Annual Pro Plan: ₹3,499 (365 Days, BEST VALUE • SAVE ₹2,489)
- * 
- * Features:
- * - Web Razorpay Checkout via dynamically loaded checkout.js
- * - Built-in In-App Razorpay Secure Checkout Fallback (Official Razorpay Blue branding)
- * - UPI / Card / NetBanking simulation for Expo Go & Web
- * - 30d / 180d / 365d auto-expiry tracking and instant unlock
+ * Pricing & Secure Checkout
+ *
+ * Step 1 — Pricing: two tiers (108 Bharat Vishwaguru / 216 Supreme Syndicate)
+ *          with a Monthly / Annually billing toggle.
+ * Step 2 — Checkout: order summary + two clearly separated payment rails:
+ *          Razorpay (India · INR) and PayPal (Global · USD), with trust badges.
+ * Step 3 — Confirmation receipt.
+ *
+ * On web, Razorpay opens the real checkout.js popup when available and falls
+ * back to the in-app test flow. PayPal runs in test mode until a live PayPal
+ * integration is connected.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   Modal,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
   ActivityIndicator,
-  Alert,
   ScrollView,
   Platform,
-  TextInput
+  Animated,
+  Easing,
+  useWindowDimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Clipboard from 'expo-clipboard';
-import { COLORS } from '../theme/colors';
-import { paymentService, SUBSCRIPTION_PLANS, loadRazorpayWebScript } from '../services/paymentService';
+import {
+  paymentService,
+  PRICING_TIERS,
+  SUBSCRIPTION_PLANS,
+  loadRazorpayWebScript
+} from '../services/paymentService';
+
+const P = {
+  bg: '#07070A',
+  panel: '#0D0D12',
+  panelRaised: '#12121A',
+  line: 'rgba(255,255,255,0.07)',
+  lineStrong: 'rgba(255,255,255,0.14)',
+  text: '#F5F5F7',
+  textDim: '#A1A1AA',
+  textFaint: '#63636E',
+  gold: '#E7C873',
+  goldDeep: '#B8913A',
+  goldSoft: 'rgba(231,200,115,0.10)',
+  goldLine: 'rgba(231,200,115,0.38)',
+  success: '#34D399'
+};
+
+const IS_WEB = Platform.OS === 'web';
+const SMOOTH = IS_WEB
+  ? {
+      transitionProperty: 'transform, background-color, border-color, box-shadow, opacity',
+      transitionDuration: '260ms',
+      transitionTimingFunction: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      cursor: 'pointer'
+    }
+  : {};
+const SERIF = Platform.select({ ios: 'Georgia', android: 'serif', default: 'Georgia, "Times New Roman", serif' });
+const MONO = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'ui-monospace, "SF Mono", Menlo, monospace' });
+
+const CURRENCY = {
+  INR: { symbol: '₹', locale: 'en-IN' },
+  USD: { symbol: '$', locale: 'en-US' }
+};
+
+const formatMoney = (amount, currency) =>
+  `${CURRENCY[currency].symbol}${Math.round(amount).toLocaleString(CURRENCY[currency].locale)}`;
+
+const planKeyFor = (tierKey, cycle) => `${tierKey}_${cycle === 'annual' ? 'ANNUAL' : 'MONTHLY'}`;
+
+const annualSavingsPct = (tier, currency) => {
+  const full = tier.prices.monthly[currency] * 12;
+  return Math.round(((full - tier.prices.annual[currency]) / full) * 100);
+};
+
+const randomId = (prefix, len = 14) =>
+  prefix + Array.from({ length: len }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+
+/* ---------------------------------------------------------------- */
+/* Payment network marks (lightweight, vector-free brand badges)    */
+/* ---------------------------------------------------------------- */
+
+function UpiMark() {
+  return (
+    <View style={[marks.chip, { backgroundColor: '#FFFFFF' }]}>
+      <Text style={{ fontSize: 10, fontWeight: '900', fontStyle: 'italic', color: '#3D3D3D', letterSpacing: -0.2 }}>UPI</Text>
+      <View style={{ flexDirection: 'row', marginLeft: 2 }}>
+        <View style={[marks.tri, { borderLeftColor: '#F37021' }]} />
+        <View style={[marks.tri, { borderLeftColor: '#109447', marginLeft: -3 }]} />
+      </View>
+    </View>
+  );
+}
+
+function RupayMark() {
+  return (
+    <View style={[marks.chip, { backgroundColor: '#FFFFFF' }]}>
+      <Text style={{ fontSize: 10, fontWeight: '900', fontStyle: 'italic', color: '#1B3A7A', letterSpacing: -0.3 }}>
+        Ru<Text style={{ color: '#F37021' }}>Pay</Text>
+      </Text>
+      <View style={{ flexDirection: 'row', marginLeft: 2 }}>
+        <View style={[marks.tri, { borderLeftColor: '#F37021' }]} />
+        <View style={[marks.tri, { borderLeftColor: '#109447', marginLeft: -3 }]} />
+      </View>
+    </View>
+  );
+}
+
+function VisaMark() {
+  return (
+    <View style={[marks.chip, { backgroundColor: '#FFFFFF' }]}>
+      <Text style={{ fontSize: 11, fontWeight: '900', fontStyle: 'italic', color: '#1A1F71', letterSpacing: 0.3 }}>VISA</Text>
+    </View>
+  );
+}
+
+function MastercardMark() {
+  return (
+    <View style={[marks.chip, { backgroundColor: '#1C1C1E' }]}>
+      <View style={[marks.circle, { backgroundColor: '#EB001B' }]} />
+      <View style={[marks.circle, { backgroundColor: '#F79E1B', marginLeft: -6, opacity: 0.92 }]} />
+    </View>
+  );
+}
+
+function AmexMark() {
+  return (
+    <View style={[marks.chip, { backgroundColor: '#1F72CD' }]}>
+      <Text style={{ fontSize: 8, fontWeight: '900', color: '#FFFFFF', letterSpacing: 0.4 }}>AMEX</Text>
+    </View>
+  );
+}
+
+function PayPalWordmark({ size = 15, dark = false }) {
+  return (
+    <Text style={{ fontSize: size, fontWeight: '900', fontStyle: 'italic', letterSpacing: -0.3 }}>
+      <Text style={{ color: dark ? '#003087' : '#FFFFFF' }}>Pay</Text>
+      <Text style={{ color: dark ? '#009CDE' : '#7FC8F8' }}>Pal</Text>
+    </Text>
+  );
+}
+
+function PayPalMark() {
+  return (
+    <View style={[marks.chip, { backgroundColor: '#FFFFFF' }]}>
+      <PayPalWordmark size={10} dark />
+    </View>
+  );
+}
+
+function RazorpayWordmark() {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Ionicons name="flash" size={13} color="#3395FF" style={{ transform: [{ skewX: '-12deg' }] }} />
+      <Text style={{ color: P.text, fontWeight: '800', fontSize: 15, letterSpacing: -0.2, marginLeft: 2 }}>Razorpay</Text>
+    </View>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Billing toggle                                                    */
+/* ---------------------------------------------------------------- */
+
+const SEG_W = 124;
+
+function BillingToggle({ cycle, onChange, savingsPct }) {
+  const anim = useRef(new Animated.Value(cycle === 'annual' ? 1 : 0)).current;
+
+  useEffect(() => {
+    Animated.spring(anim, {
+      toValue: cycle === 'annual' ? 1 : 0,
+      useNativeDriver: !IS_WEB,
+      damping: 20,
+      stiffness: 220,
+      mass: 0.8
+    }).start();
+  }, [cycle]);
+
+  const translateX = anim.interpolate({ inputRange: [0, 1], outputRange: [0, SEG_W] });
+
+  return (
+    <View style={styles.toggleWrap}>
+      <View style={styles.toggleTrack} accessibilityRole="radiogroup">
+        <Animated.View style={[styles.toggleThumb, { transform: [{ translateX }] }]} />
+        {[
+          { key: 'monthly', label: 'Monthly' },
+          { key: 'annual', label: 'Annually' }
+        ].map(opt => (
+          <Pressable
+            key={opt.key}
+            onPress={() => onChange(opt.key)}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: cycle === opt.key }}
+            style={[styles.toggleSeg, SMOOTH]}
+          >
+            {({ hovered }) => (
+              <Text
+                style={[
+                  styles.toggleLabel,
+                  cycle === opt.key ? styles.toggleLabelActive : hovered && { color: P.text }
+                ]}
+              >
+                {opt.label}
+              </Text>
+            )}
+          </Pressable>
+        ))}
+      </View>
+      <View style={styles.savePill}>
+        <Ionicons name="sparkles" size={11} color={P.gold} />
+        <Text style={styles.savePillText}>Save up to {savingsPct}% yearly</Text>
+      </View>
+    </View>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Plan card                                                         */
+/* ---------------------------------------------------------------- */
+
+function PlanCard({ tier, cycle, featured, onSelect, isWide }) {
+  const price = tier.prices[cycle].INR;
+  const perMonth = cycle === 'annual' ? tier.prices.annual.INR / 12 : price;
+  const usd = tier.prices[cycle].USD;
+  const pct = annualSavingsPct(tier, 'INR');
+
+  return (
+    <Pressable
+      onPress={onSelect}
+      style={({ hovered, pressed }) => [
+        styles.planCard,
+        isWide && { flex: 1 },
+        featured && styles.planCardFeatured,
+        SMOOTH,
+        hovered && {
+          transform: [{ translateY: -6 }],
+          borderColor: featured ? P.gold : P.lineStrong,
+          shadowColor: featured ? P.gold : '#000',
+          shadowOpacity: featured ? 0.22 : 0.5,
+          shadowRadius: 40,
+          shadowOffset: { width: 0, height: 24 }
+        },
+        pressed && { transform: [{ translateY: -2 }, { scale: 0.995 }] }
+      ]}
+    >
+      {({ hovered }) => (
+        <>
+          {featured && (
+            <LinearGradient
+              colors={['rgba(231,200,115,0.14)', 'rgba(231,200,115,0)']}
+              start={{ x: 0.5, y: 0 }}
+              end={{ x: 0.5, y: 0.6 }}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          )}
+
+          <View style={styles.planHeadRow}>
+            <View style={[styles.tierChip, featured && styles.tierChipFeatured]}>
+              <Text style={[styles.tierChipText, featured && { color: P.gold }]}>{tier.tier.toUpperCase()}</Text>
+            </View>
+            {tier.highlight && (
+              <LinearGradient colors={[P.gold, P.goldDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.popularBadge}>
+                <Ionicons name="star" size={9} color="#1A1408" />
+                <Text style={styles.popularText}>{tier.highlight}</Text>
+              </LinearGradient>
+            )}
+          </View>
+
+          <Text style={styles.planName}>{tier.name}</Text>
+          <Text style={styles.planTagline}>{tier.tagline}</Text>
+
+          <View style={styles.priceRow}>
+            <Text style={styles.priceCurrency}>₹</Text>
+            <Text style={styles.priceBig}>{Math.round(perMonth).toLocaleString('en-IN')}</Text>
+            <Text style={styles.pricePer}>/ month</Text>
+          </View>
+          <Text style={styles.priceSub}>
+            {cycle === 'annual'
+              ? `Billed ${formatMoney(price, 'INR')} yearly · save ${pct}%`
+              : 'Billed monthly · switch to annual anytime'}
+          </Text>
+          <Text style={styles.priceUsd}>
+            or {formatMoney(usd, 'USD')} {cycle === 'annual' ? '/ year' : '/ month'} worldwide via PayPal
+          </Text>
+
+          <View style={[styles.cta, featured ? styles.ctaGold : styles.ctaGhost, SMOOTH, hovered && (featured ? styles.ctaGoldHover : styles.ctaGhostHover)]}>
+            {featured ? (
+              <LinearGradient colors={[P.gold, P.goldDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+            ) : null}
+            <Text style={[styles.ctaText, featured && { color: '#1A1408' }]}>Get {tier.tier}</Text>
+            <Ionicons
+              name="arrow-forward"
+              size={16}
+              color={featured ? '#1A1408' : P.text}
+              style={[SMOOTH, { marginLeft: 8 }, hovered && { transform: [{ translateX: 3 }] }]}
+            />
+          </View>
+
+          <View style={styles.planDivider} />
+
+          <Text style={styles.featuresHeading}>What's included</Text>
+          {tier.features.map(f => (
+            <View key={f} style={styles.featureRow}>
+              <View style={[styles.featureTick, featured && styles.featureTickGold]}>
+                <Ionicons name="checkmark" size={11} color={featured ? '#1A1408' : P.text} />
+              </View>
+              <Text style={styles.featureText}>{f}</Text>
+            </View>
+          ))}
+        </>
+      )}
+    </Pressable>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Payment method option                                             */
+/* ---------------------------------------------------------------- */
+
+function MethodOption({ selected, onPress, region, regionIcon, title, logo, subtitle, children }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="radio"
+      accessibilityState={{ selected }}
+      style={({ hovered, pressed }) => [
+        styles.method,
+        SMOOTH,
+        hovered && !selected && { borderColor: P.lineStrong, backgroundColor: '#14141C' },
+        selected && styles.methodSelected,
+        pressed && { transform: [{ scale: 0.995 }] }
+      ]}
+    >
+      <View style={styles.methodTop}>
+        <View style={[styles.radio, selected && styles.radioOn, SMOOTH]}>
+          {selected && <View style={styles.radioDot} />}
+        </View>
+        <View style={{ flex: 1 }}>
+          <View style={styles.methodTitleRow}>
+            <Text style={styles.methodTitle}>{title}</Text>
+            <View style={styles.regionChip}>
+              <Text style={styles.regionEmoji}>{regionIcon}</Text>
+              <Text style={styles.regionText}>{region}</Text>
+            </View>
+          </View>
+          <Text style={styles.methodSub}>{subtitle}</Text>
+        </View>
+        <View style={styles.methodLogo}>{logo}</View>
+      </View>
+      <View style={styles.methodMarks}>{children}</View>
+    </Pressable>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Main modal                                                        */
+/* ---------------------------------------------------------------- */
 
 export default function PaywallModal({ visible, onClose, onSuccess, initialPlanKey }) {
-  const [selectedPlanKey, setSelectedPlanKey] = useState('ANNUAL');
-  const [loading, setLoading] = useState(false);
+  const { width } = useWindowDimensions();
+  const isWide = width >= 860;
+
+  const [step, setStep] = useState('pricing'); // pricing | checkout | success
+  const [cycle, setCycle] = useState('annual');
+  const [tierKey, setTierKey] = useState('SYNDICATE');
+  const [method, setMethod] = useState('razorpay'); // razorpay | paypal
+  const [processing, setProcessing] = useState(false);
+  const [processingLabel, setProcessingLabel] = useState('');
+  const [receipt, setReceipt] = useState(null);
   const [userStatus, setUserStatus] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
 
-  // In-App Razorpay Secure Checkout Modal state
-  const [showRazorpaySheet, setShowRazorpaySheet] = useState(false);
-  const [selectedMethod, setSelectedMethod] = useState('upi'); // upi | card | netbanking
-  const [upiIdInput, setUpiIdInput] = useState('councilx@okaxis');
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const fade = useRef(new Animated.Value(0)).current;
+  const successScale = useRef(new Animated.Value(0.6)).current;
 
   useEffect(() => {
-    if (visible) {
-      loadStatus();
-      if (Platform.OS === 'web') {
-        loadRazorpayWebScript();
-      }
-    }
+    if (!visible) return;
+    setStep('pricing');
+    setProcessing(false);
+    setReceipt(null);
+    paymentService.getUserStatus().then(setUserStatus);
+    if (IS_WEB) loadRazorpayWebScript();
   }, [visible]);
 
   useEffect(() => {
-    if (initialPlanKey) {
-      if (initialPlanKey === '1_month' || initialPlanKey === 'MONTHLY') {
-        setSelectedPlanKey('MONTHLY');
-      } else if (initialPlanKey === '6_month' || initialPlanKey === 'SEMI_ANNUAL') {
-        setSelectedPlanKey('SEMI_ANNUAL');
-      } else if (initialPlanKey === '1_year' || initialPlanKey === 'ANNUAL') {
-        setSelectedPlanKey('ANNUAL');
-      } else if (initialPlanKey === 'extra_agent_slot' || initialPlanKey === 'EXTRA_AGENT_SLOT') {
-        setSelectedPlanKey('EXTRA_AGENT_SLOT');
-      }
-    }
+    if (!initialPlanKey) return;
+    const key = String(initialPlanKey).toUpperCase();
+    if (key.startsWith('VISHWAGURU')) setTierKey('VISHWAGURU');
+    if (key.startsWith('SYNDICATE')) setTierKey('SYNDICATE');
+    setCycle(key.includes('MONTH') && !key.includes('6_') ? 'monthly' : 'annual');
   }, [initialPlanKey, visible]);
 
-  const loadStatus = async () => {
-    const status = await paymentService.getUserStatus();
-    setUserStatus(status);
-  };
+  // Gentle cross-fade between steps
+  useEffect(() => {
+    fade.setValue(0);
+    Animated.timing(fade, {
+      toValue: 1,
+      duration: 380,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: !IS_WEB
+    }).start();
+    if (step === 'success') {
+      successScale.setValue(0.6);
+      Animated.spring(successScale, { toValue: 1, damping: 11, stiffness: 160, useNativeDriver: !IS_WEB }).start();
+    }
+  }, [step]);
 
   if (!visible) return null;
 
-  const currentPlan = selectedPlanKey === 'EXTRA_AGENT_SLOT'
-    ? { name: '+1 Personal Agent Slot', price: 49, days: 365, customAgentsLimit: 1 }
-    : (SUBSCRIPTION_PLANS[selectedPlanKey] || SUBSCRIPTION_PLANS.ANNUAL);
+  const tier = PRICING_TIERS[tierKey];
+  const planKey = planKeyFor(tierKey, cycle);
+  const plan = SUBSCRIPTION_PLANS[planKey];
+  const currency = method === 'paypal' ? 'USD' : 'INR';
+  const total = tier.prices[cycle][currency];
+  const listPrice = cycle === 'annual' ? tier.prices.monthly[currency] * 12 : total;
+  const discount = listPrice - total;
+  const renewDate = new Date(Date.now() + plan.days * 86400000).toLocaleDateString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric'
+  });
+  const maxSavings = Math.max(...Object.values(PRICING_TIERS).map(t => annualSavingsPct(t, 'INR')));
 
-  const handleUpgradePlan = (planKey) => {
-    setSelectedPlanKey(planKey);
-    setTimeout(() => {
-      handleUpgradePress(planKey);
-    }, 50);
+  const finalize = async (paymentId, gateway) => {
+    const res = await paymentService.processRazorpayPlan(planKey, paymentId, { gateway, currency });
+    setReceipt({
+      paymentId: res.paymentId,
+      amount: formatMoney(total, currency),
+      gateway,
+      planName: tier.name,
+      cycle: cycle === 'annual' ? 'Annual' : 'Monthly',
+      validUntil: new Date(res.expiresAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })
+    });
+    setProcessing(false);
+    setStep('success');
   };
 
-  const handleBuyExtraSlot49 = async () => {
-    setLoading(true);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      try {
-        const scriptLoaded = await loadRazorpayWebScript();
-        if (scriptLoaded && window.Razorpay) {
-          const razorpayKey = paymentService.getRazorpayKey();
-          const options = {
-            key: razorpayKey,
-            amount: 4900,
-            currency: 'INR',
-            name: 'Council X | The Syndicate',
-            description: '+1 Personal Agent Slot (Permanent Vault Upgrade)',
-            theme: { color: '#000000' },
-            handler: async (response) => {
-              await paymentService.purchaseExtraAgentSlot(response.razorpay_payment_id);
-              setLoading(false);
-              Alert.alert(
-                '⚡ Slot Unlocked',
-                'Your vault capacity has been upgraded with +1 Personal Mastermind slot!',
-                [{ text: 'OK', onPress: () => { onSuccess?.(); onClose?.(); } }]
-              );
-            },
-            modal: {
-              ondismiss: () => setLoading(false)
-            }
-          };
-          const rzp = new window.Razorpay(options);
-          rzp.open();
-          setLoading(false);
-          return;
-        }
-      } catch (e) {
-        console.warn('Web razorpay error:', e);
-      }
+  const runTestFlow = async (stages, gateway, idPrefix) => {
+    for (const label of stages) {
+      setProcessingLabel(label);
+      await new Promise(r => setTimeout(r, 900));
     }
-    setLoading(false);
-    setSelectedPlanKey('EXTRA_AGENT_SLOT');
-    setShowRazorpaySheet(true);
+    await finalize(randomId(idPrefix), gateway);
   };
 
-  /**
-   * Main checkout handler
-   * On web: attempts window.Razorpay; falls back to internal Razorpay checkout modal
-   */
-  const handleUpgradePress = async (planKeyOverride) => {
-    const activeKey = planKeyOverride || selectedPlanKey;
-    if (activeKey === 'EXTRA_AGENT_SLOT') {
-      return handleBuyExtraSlot49();
-    }
+  const handlePay = async () => {
+    if (processing) return;
+    setProcessing(true);
 
-    const plan = SUBSCRIPTION_PLANS[activeKey] || SUBSCRIPTION_PLANS.ANNUAL;
-    setLoading(true);
-
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      try {
-        const scriptLoaded = await loadRazorpayWebScript();
-        if (scriptLoaded && window.Razorpay) {
-          const razorpayKey = paymentService.getRazorpayKey();
-
-          const options = {
-            key: razorpayKey,
-            amount: plan.price * 100, // paise
-            currency: 'INR',
-            name: 'Council X | The Syndicate',
-            description: `${plan.name} (${plan.days} Days Sovereign Access)`,
-            image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-            handler: async (response) => {
-              const res = await paymentService.processRazorpayPlan(
-                activeKey,
-                response.razorpay_payment_id
-              );
-              setLoading(false);
-              Alert.alert(
-                '👑 Welcome to The Inner Circle',
-                `Your ${res.plan.name} is now active for ${res.plan.days} days. All 216 Masterminds and the All-in-One Supreme Council are fully unlocked!`,
-                [{ text: 'Enter Chamber', onPress: () => { onSuccess?.(); onClose?.(); } }]
-              );
-            },
-            prefill: {
-              email: 'member@councilx.ai',
-              contact: '9999999999'
-            },
-            theme: {
-              color: '#000000'
-            },
-            modal: {
-              ondismiss: () => {
-                setLoading(false);
-              }
-            }
-          };
-
-          const rzp = new window.Razorpay(options);
-          rzp.on('payment.failed', (err) => {
-            console.warn('Razorpay payment failed:', err);
-            setLoading(false);
-            setShowRazorpaySheet(true);
-          });
-          rzp.open();
-          setLoading(false);
-          return;
-        }
-      } catch (err) {
-        console.warn('Web Razorpay popup bypassed:', err);
-      }
-    }
-
-    // Default to the authentic In-App Razorpay Checkout Sheet
-    setLoading(false);
-    setShowRazorpaySheet(true);
-  };
-
-  /**
-   * Complete payment through in-app Razorpay modal (Test Mode)
-   */
-  const handleCompleteInAppPayment = async () => {
-    setIsProcessingPayment(true);
     try {
-      // Simulate Razorpay gateway transaction capture
-      const generatedPayId = 'pay_rzp_' + Math.random().toString(36).substring(2, 10).toUpperCase();
-
-      if (selectedPlanKey === 'EXTRA_AGENT_SLOT') {
-        await paymentService.purchaseExtraAgentSlot(generatedPayId);
-        setIsProcessingPayment(false);
-        setShowRazorpaySheet(false);
-        Alert.alert(
-          '⚡ Slot Unlocked',
-          'Your vault capacity has been upgraded with +1 Personal Mastermind slot!',
-          [{ text: 'Enter Chamber', onPress: () => { onSuccess?.(); onClose?.(); } }]
-        );
-        return;
-      }
-
-      const result = await paymentService.processRazorpayPlan(selectedPlanKey, generatedPayId);
-
-      setIsProcessingPayment(false);
-      setShowRazorpaySheet(false);
-
-      Alert.alert(
-        '👑 Welcome to The Inner Circle',
-        `Your ${result.plan.name} has been activated (${result.plan.days} Days). Payment ID: ${result.paymentId}.\n\nAll 216 Masterminds and the All-in-One Supreme Council are now unlocked!`,
-        [
-          {
-            text: 'Enter Chamber',
-            onPress: () => {
-              onSuccess?.();
-              onClose?.();
-            }
+      if (method === 'razorpay') {
+        setProcessingLabel('Opening Razorpay secure checkout…');
+        if (IS_WEB && typeof window !== 'undefined') {
+          const loaded = await loadRazorpayWebScript();
+          if (loaded && window.Razorpay) {
+            const rzp = new window.Razorpay({
+              key: paymentService.getRazorpayKey(),
+              amount: total * 100,
+              currency: 'INR',
+              name: 'CouncilX',
+              description: `${tier.name} · ${cycle === 'annual' ? 'Annual' : 'Monthly'}`,
+              theme: { color: '#B8913A' },
+              handler: response => {
+                setProcessingLabel('Verifying payment…');
+                finalize(response.razorpay_payment_id, 'Razorpay');
+              },
+              modal: { ondismiss: () => setProcessing(false) }
+            });
+            rzp.on('payment.failed', () => setProcessing(false));
+            rzp.open();
+            return;
           }
-        ]
-      );
-    } catch (err) {
-      setIsProcessingPayment(false);
-      Alert.alert('Payment Error', 'Unable to capture transaction. Please try again.');
+        }
+        await runTestFlow(['Contacting Razorpay…', 'Authorizing payment…', 'Confirming with your bank…'], 'Razorpay', 'pay_');
+      } else {
+        await runTestFlow(['Connecting to PayPal…', 'Authorizing payment…', 'Finalizing your membership…'], 'PayPal', 'PAYID-');
+      }
+    } catch (e) {
+      console.warn('Checkout error:', e);
+      setProcessing(false);
     }
   };
 
   const handleCopyReferral = async () => {
-    if (userStatus?.myReferralCode) {
-      await Clipboard.setStringAsync(
-        `Join me on Council X | The Syndicate! Use my invite code ${userStatus.myReferralCode} to get +15 FREE Mastermind Chats: https://councilx.ai`
-      );
-      setCopiedCode(true);
-      setTimeout(() => setCopiedCode(false), 2500);
-    }
+    if (!userStatus?.myReferralCode) return;
+    await Clipboard.setStringAsync(
+      `Join me on CouncilX! Use my invite code ${userStatus.myReferralCode} to get +15 free Mastermind chats: https://councilxai.com`
+    );
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2400);
   };
 
-  return (
-    <>
-      <Modal
-        visible={visible && !showRazorpaySheet}
-        transparent
-        animationType="slide"
-        onRequestClose={onClose}
-      >
-        <View style={styles.overlay}>
-          <View style={styles.container}>
-            {/* Close button */}
-            <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-              <Ionicons name="close" size={22} color={COLORS.textSecondary} />
-            </TouchableOpacity>
+  const close = () => {
+    if (processing) return;
+    onClose?.();
+  };
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-              {/* Header Insignia */}
-              <View style={styles.header}>
-                <View style={styles.iconCircle}>
-                  <Ionicons name="diamond" size={26} color="#FFFFFF" />
-                </View>
-                <Text style={styles.subTitle}>THE 216 SUPREME SYNDICATE</Text>
-                <Text style={styles.mainTitle}>UPGRADE TO SYNDICATE PRO</Text>
-
-                {userStatus?.isExpired ? (
-                  <View style={styles.expiredBanner}>
-                    <Ionicons name="alert-circle" size={14} color="#FFF" />
-                    <Text style={styles.expiredText}>
-                      Your Subscription Has Expired — Renew Plan to Continue
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.badgeLimit}>
-                    <Ionicons name="lock-closed" size={12} color="#E63946" />
-                    <Text style={styles.badgeText}>
-                      Free Quota Exhausted ({userStatus?.totalAllowedFree || 5} Free Chats Used)
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Refer & Earn Free Chats Banner */}
-              <View style={styles.referralBanner}>
-                <View style={styles.refInfo}>
-                  <Text style={styles.refHeading}>🎁 REFER FRIENDS & EARN FREE CHATS</Text>
-                  <Text style={styles.refDesc}>
-                    Your Code: <Text style={styles.refCodeText}>{userStatus?.myReferralCode || 'CX-PRO'}</Text>
-                    {'\n'}Friends get +15 Chats • You get +30 Chats!
-                  </Text>
-                </View>
-                <TouchableOpacity style={styles.copyRefBtn} onPress={handleCopyReferral}>
-                  <Ionicons name={copiedCode ? "checkmark" : "copy-outline"} size={14} color="#000" />
-                  <Text style={styles.copyRefText}>{copiedCode ? 'COPIED!' : 'SHARE'}</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* 3 Subscription Plans + Standalone ₹49 Extra Agent Slot */}
-              <View style={styles.plansContainer}>
-                {/* 1. Monthly Plan */}
-                <TouchableOpacity
-                  style={[
-                    styles.planCard,
-                    selectedPlanKey === 'MONTHLY' && styles.selectedPlanCard
-                  ]}
-                  onPress={() => setSelectedPlanKey('MONTHLY')}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.planLeft}>
-                    <Text style={styles.planName}>1-Month Pro Plan</Text>
-                    <Text style={styles.planDays}>30 Days Access • 15 Custom Agents</Text>
-                  </View>
-                  <View style={styles.planRightRow}>
-                    <View style={styles.priceWrap}>
-                      <Text style={styles.planPrice}>₹499</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.buyCardBtn}
-                      onPress={() => handleUpgradePlan('MONTHLY')}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.buyCardBtnText}>Buy Plan</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-
-                {/* 2. 6-Month Plan */}
-                <TouchableOpacity
-                  style={[
-                    styles.planCard,
-                    selectedPlanKey === 'SEMI_ANNUAL' && styles.selectedPlanCard
-                  ]}
-                  onPress={() => setSelectedPlanKey('SEMI_ANNUAL')}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.discountBadge}>
-                    <Text style={styles.discountText}>SAVE 33% DISCOUNT</Text>
-                  </View>
-                  <View style={styles.planLeft}>
-                    <Text style={styles.planName}>6-Month Pro Plan</Text>
-                    <Text style={styles.planDays}>180 Days Access • 50 Custom Agents</Text>
-                  </View>
-                  <View style={styles.planRightRow}>
-                    <View style={styles.priceWrap}>
-                      <Text style={styles.planPrice}>₹1,999</Text>
-                      <Text style={styles.planStrike}>₹2,994</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.buyCardBtn}
-                      onPress={() => handleUpgradePlan('SEMI_ANNUAL')}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.buyCardBtnText}>Buy Plan</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-
-                {/* 3. 1-Year Annual Plan */}
-                <TouchableOpacity
-                  style={[
-                    styles.planCard,
-                    styles.annualCard,
-                    selectedPlanKey === 'ANNUAL' && styles.selectedPlanCard
-                  ]}
-                  onPress={() => setSelectedPlanKey('ANNUAL')}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.bestValueBadge}>
-                    <Ionicons name="sparkles" size={10} color="#000000" />
-                    <Text style={styles.bestValueText}>BEST VALUE • SAVE ₹2,489 DISCOUNT</Text>
-                  </View>
-                  <View style={styles.planLeft}>
-                    <Text style={styles.planName}>1-Year Annual Pro Plan</Text>
-                    <Text style={styles.planDays}>365 Days Access • Unlimited Custom Agents</Text>
-                  </View>
-                  <View style={styles.planRightRow}>
-                    <View style={styles.priceWrap}>
-                      <Text style={styles.planPriceHighlight}>₹3,499</Text>
-                      <Text style={styles.planStrike}>₹5,988</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.buyCardBtn}
-                      onPress={() => handleUpgradePlan('ANNUAL')}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.buyCardBtnText}>Buy Plan</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-
-                {/* 4. Standalone ₹49 Extra Agent Slot (Purchasable Anytime) */}
-                <TouchableOpacity
-                  style={[
-                    styles.planCard,
-                    styles.slotCard49,
-                    selectedPlanKey === 'EXTRA_AGENT_SLOT' && styles.selectedPlanCard
-                  ]}
-                  onPress={handleBuyExtraSlot49}
-                  activeOpacity={0.85}
-                >
-                  <View style={styles.slotBadge49}>
-                    <Ionicons name="flash" size={10} color="#000000" />
-                    <Text style={styles.slotBadge49Text}>STANDALONE UPGRADE</Text>
-                  </View>
-                  <View style={styles.planLeft}>
-                    <Text style={styles.planName}>⚡ +1 Personal Agent Slot</Text>
-                    <Text style={styles.planDays}>Lifetime Vault Capacity • No Subscription Needed</Text>
-                  </View>
-                  <View style={styles.planRightRow}>
-                    <View style={styles.priceWrap}>
-                      <Text style={styles.planPrice}>₹49</Text>
-                    </View>
-                    <TouchableOpacity
-                      style={styles.buyCardBtn}
-                      onPress={handleBuyExtraSlot49}
-                      disabled={loading}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.buyCardBtnText}>Buy ₹49</Text>
-                    </TouchableOpacity>
-                  </View>
-                </TouchableOpacity>
-              </View>
-
-              {/* Feature Perks */}
-              <View style={styles.perksBox}>
-                <View style={styles.perkRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                  <Text style={styles.perkText}>Unlimited 1-on-1 Chats with all 216 Masterminds</Text>
-                </View>
-                <View style={styles.perkRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                  <Text style={styles.perkText}>ALL-IN-ONE 216 Supreme Council (૨૧૬ માસ્ટરમાઇન્ડ મહા-સભા)</Text>
-                </View>
-                <View style={styles.perkRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                  <Text style={styles.perkText}>Create Personal Thinkers with Auto-Wikipedia Research</Text>
-                </View>
-                <View style={styles.perkRow}>
-                  <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                  <Text style={styles.perkText}>Multi-Model Cascade with Google Search Grounding</Text>
-                </View>
-              </View>
-
-              {/* Primary Upgrade CTA Button / Active Indicator */}
-              {userStatus?.isPremium && userStatus?.expiresAt && Date.now() < userStatus.expiresAt ? (
-                <View style={[styles.payButton, { backgroundColor: '#1A1A1A', borderWidth: 1, borderColor: '#333333' }]}>
-                  <Ionicons name="checkmark-circle" size={18} color="#FFFFFF" />
-                  <Text style={[styles.payButtonText, { color: '#FFFFFF' }]}>
-                    PRO PLAN ACTIVE ✓ (EXPIRES {new Date(userStatus.expiresAt).toLocaleDateString()})
-                  </Text>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={[styles.payButton, loading && styles.btnDisabled]}
-                  onPress={handleUpgradePress}
-                  disabled={loading}
-                  activeOpacity={0.88}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="#000" />
-                  ) : (
-                    <>
-                      <Ionicons name="shield-checkmark" size={18} color="#000" />
-                      <Text style={styles.payButtonText}>
-                        {userStatus?.isExpired ? 'RENEW NOW' : 'UPGRADE NOW'} • {currentPlan.name.toUpperCase()} (₹{currentPlan.price})
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity
-                onPress={() => setShowRazorpaySheet(true)}
-                style={styles.openDirectTestBtn}
-              >
-                <Text style={styles.openDirectTestText}>
-                  Or Open In-App Razorpay Checkout Sheet (Test Mode) →
-                </Text>
-              </TouchableOpacity>
-
-              <Text style={styles.securityText}>
-                🔒 Secured by Razorpay 256-bit SSL • Instant Activation
-              </Text>
-            </ScrollView>
-          </View>
+  /* ------------------------------ Pricing ------------------------------ */
+  const renderPricing = () => (
+    <View>
+      <View style={styles.hero}>
+        <View style={styles.eyebrow}>
+          <View style={styles.eyebrowDot} />
+          <Text style={styles.eyebrowText}>COUNCILX MEMBERSHIP</Text>
         </View>
-      </Modal>
+        <Text style={[styles.heroTitle, !isWide && { fontSize: 32, lineHeight: 38 }]}>
+          Convene the greatest minds{'\n'}
+          <Text style={{ color: P.gold, fontStyle: 'italic' }}>in human history.</Text>
+        </Text>
+        <Text style={styles.heroSub}>
+          One membership. Unlimited counsel from history's sharpest strategists, philosophers and builders.
+        </Text>
 
-      {/* BUILT-IN RAZORPAY SECURE CHECKOUT MODAL (OFFICIAL RAZORPAY THEME) */}
-      <Modal
-        visible={showRazorpaySheet}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowRazorpaySheet(false)}
+        {userStatus?.isExpired ? (
+          <View style={styles.notice}>
+            <Ionicons name="time-outline" size={13} color={P.gold} />
+            <Text style={styles.noticeText}>Your membership has expired — renew to continue your sessions.</Text>
+          </View>
+        ) : userStatus && !userStatus.isPremium && userStatus.remainingFree === 0 ? (
+          <View style={styles.notice}>
+            <Ionicons name="lock-closed-outline" size={13} color={P.gold} />
+            <Text style={styles.noticeText}>
+              You've used all {userStatus.totalAllowedFree} free sessions. Upgrade to keep the council in session.
+            </Text>
+          </View>
+        ) : null}
+
+        <BillingToggle cycle={cycle} onChange={setCycle} savingsPct={maxSavings} />
+      </View>
+
+      <View style={[styles.plansRow, isWide ? { flexDirection: 'row' } : { flexDirection: 'column' }]}>
+        {Object.values(PRICING_TIERS).map(t => (
+          <PlanCard
+            key={t.key}
+            tier={t}
+            cycle={cycle}
+            featured={t.key === 'SYNDICATE'}
+            isWide={isWide}
+            onSelect={() => {
+              setTierKey(t.key);
+              setStep('checkout');
+            }}
+          />
+        ))}
+      </View>
+
+      <View style={styles.reassureRow}>
+        {[
+          { icon: 'shield-checkmark-outline', text: 'Secure payments' },
+          { icon: 'refresh-outline', text: 'Cancel anytime' },
+          { icon: 'receipt-outline', text: 'Taxes included' }
+        ].map(r => (
+          <View key={r.text} style={styles.reassureItem}>
+            <Ionicons name={r.icon} size={14} color={P.textDim} />
+            <Text style={styles.reassureText}>{r.text}</Text>
+          </View>
+        ))}
+      </View>
+
+      {userStatus?.myReferralCode && !userStatus?.isPremium ? (
+        <Pressable
+          onPress={handleCopyReferral}
+          style={({ hovered }) => [styles.referral, SMOOTH, hovered && { borderColor: P.lineStrong }]}
+        >
+          <Ionicons name="gift-outline" size={16} color={P.gold} />
+          <Text style={styles.referralText}>
+            Not ready yet? Invite a friend with code{' '}
+            <Text style={{ color: P.text, fontFamily: MONO }}>{userStatus.myReferralCode}</Text> — they get +15 chats,
+            you get +30.
+          </Text>
+          <Text style={styles.referralAction}>{copiedCode ? 'Copied ✓' : 'Copy invite'}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+
+  /* ------------------------------ Checkout ----------------------------- */
+  const renderCheckout = () => (
+    <View>
+      <Pressable
+        onPress={() => !processing && setStep('pricing')}
+        style={({ hovered }) => [styles.backLink, SMOOTH, hovered && { opacity: 1, transform: [{ translateX: -2 }] }]}
       >
-        <View style={styles.rzpOverlay}>
-          <View style={styles.rzpModalContainer}>
-            {/* Razorpay Header */}
-            <View style={styles.rzpHeader}>
-              <View style={styles.rzpBrandRow}>
-                <View style={styles.rzpLogoBadge}>
-                  <Ionicons name="shield" size={16} color="#0C2340" />
-                </View>
-                <View>
-                  <Text style={styles.rzpBrandName}>Razorpay</Text>
-                  <Text style={styles.rzpBrandSub}>TRUSTED BUSINESS SECURE CHECKOUT</Text>
-                </View>
+        <Ionicons name="arrow-back" size={14} color={P.textDim} />
+        <Text style={styles.backText}>All plans</Text>
+      </Pressable>
+
+      <Text style={styles.checkoutTitle}>Secure checkout</Text>
+
+      <View style={[styles.checkoutGrid, isWide ? { flexDirection: 'row' } : { flexDirection: 'column-reverse' }]}>
+        {/* Payment column */}
+        <View style={[styles.checkoutBox, isWide && { flex: 1.25 }]}>
+          <Text style={styles.sectionLabel}>PAYMENT METHOD</Text>
+
+          <MethodOption
+            selected={method === 'razorpay'}
+            onPress={() => !processing && setMethod('razorpay')}
+            region="India"
+            regionIcon="🇮🇳"
+            title="Pay with Razorpay"
+            subtitle="Cards, UPI, NetBanking"
+            logo={<RazorpayWordmark />}
+          >
+            <UpiMark />
+            <RupayMark />
+            <VisaMark />
+            <MastercardMark />
+            <Text style={styles.marksMore}>+ NetBanking & Wallets</Text>
+          </MethodOption>
+
+          <View style={styles.orRow}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.orLine} />
+          </View>
+
+          <MethodOption
+            selected={method === 'paypal'}
+            onPress={() => !processing && setMethod('paypal')}
+            region="Global"
+            regionIcon="🌐"
+            title="Pay with PayPal"
+            subtitle="International Cards & PayPal"
+            logo={<PayPalWordmark />}
+          >
+            <PayPalMark />
+            <VisaMark />
+            <MastercardMark />
+            <AmexMark />
+            <Text style={styles.marksMore}>200+ countries · USD</Text>
+          </MethodOption>
+
+          <Pressable
+            onPress={handlePay}
+            disabled={processing}
+            style={({ hovered, pressed }) => [
+              styles.payBtn,
+              method === 'paypal' && styles.payBtnPaypal,
+              SMOOTH,
+              hovered && !processing && styles.payBtnHover,
+              pressed && !processing && { transform: [{ scale: 0.985 }] },
+              processing && { opacity: 0.92 }
+            ]}
+          >
+            {method === 'razorpay' && (
+              <LinearGradient colors={[P.gold, P.goldDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+            )}
+            {processing ? (
+              <View style={styles.payInner}>
+                <ActivityIndicator size="small" color={method === 'paypal' ? '#003087' : '#1A1408'} />
+                <Text style={[styles.payText, method === 'paypal' && { color: '#003087' }, { marginLeft: 10 }]}>
+                  {processingLabel}
+                </Text>
               </View>
-              <TouchableOpacity
-                style={styles.rzpCloseBtn}
-                onPress={() => setShowRazorpaySheet(false)}
-              >
-                <Ionicons name="close" size={20} color="#FFFFFF" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Plan Summary Bar */}
-            <View style={styles.rzpOrderBar}>
-              <View>
-                <Text style={styles.rzpOrderTitle}>{currentPlan.name}</Text>
-                <Text style={styles.rzpOrderDays}>Valid for {currentPlan.days} Days • Full Access</Text>
+            ) : method === 'razorpay' ? (
+              <View style={styles.payInner}>
+                <Ionicons name="lock-closed" size={15} color="#1A1408" />
+                <Text style={[styles.payText, { marginLeft: 8 }]}>Pay {formatMoney(total, 'INR')} securely</Text>
               </View>
-              <Text style={styles.rzpOrderAmount}>₹{currentPlan.price}.00</Text>
-            </View>
-
-            {/* Test Mode Banner */}
-            <View style={styles.rzpTestBanner}>
-              <Ionicons name="information-circle" size={14} color="#0C2340" />
-              <Text style={styles.rzpTestBannerText}>
-                Razorpay Test Mode Active — One-click simulation enabled
-              </Text>
-            </View>
-
-            {/* Payment Method Selector */}
-            <View style={styles.rzpMethodsContainer}>
-              <Text style={styles.rzpSectionTitle}>SELECT PAYMENT METHOD</Text>
-
-              {/* UPI Option */}
-              <TouchableOpacity
-                style={[
-                  styles.rzpMethodRow,
-                  selectedMethod === 'upi' && styles.rzpMethodRowActive
-                ]}
-                onPress={() => setSelectedMethod('upi')}
-              >
-                <View style={styles.rzpMethodIcon}>
-                  <Ionicons name="phone-portrait-outline" size={18} color="#0C2340" />
-                </View>
-                <View style={styles.rzpMethodInfo}>
-                  <Text style={styles.rzpMethodTitle}>UPI / QR (Google Pay, PhonePe, Paytm)</Text>
-                  <Text style={styles.rzpMethodSub}>Instant approval via virtual UPI</Text>
-                </View>
-                <Ionicons
-                  name={selectedMethod === 'upi' ? "radio-button-on" : "radio-button-off"}
-                  size={18}
-                  color="#0C2340"
-                />
-              </TouchableOpacity>
-
-              {/* Card Option */}
-              <TouchableOpacity
-                style={[
-                  styles.rzpMethodRow,
-                  selectedMethod === 'card' && styles.rzpMethodRowActive
-                ]}
-                onPress={() => setSelectedMethod('card')}
-              >
-                <View style={styles.rzpMethodIcon}>
-                  <Ionicons name="card-outline" size={18} color="#0C2340" />
-                </View>
-                <View style={styles.rzpMethodInfo}>
-                  <Text style={styles.rzpMethodTitle}>Credit / Debit Card</Text>
-                  <Text style={styles.rzpMethodSub}>Visa, Mastercard, RuPay</Text>
-                </View>
-                <Ionicons
-                  name={selectedMethod === 'card' ? "radio-button-on" : "radio-button-off"}
-                  size={18}
-                  color="#0C2340"
-                />
-              </TouchableOpacity>
-
-              {/* NetBanking Option */}
-              <TouchableOpacity
-                style={[
-                  styles.rzpMethodRow,
-                  selectedMethod === 'netbanking' && styles.rzpMethodRowActive
-                ]}
-                onPress={() => setSelectedMethod('netbanking')}
-              >
-                <View style={styles.rzpMethodIcon}>
-                  <Ionicons name="business-outline" size={18} color="#0C2340" />
-                </View>
-                <View style={styles.rzpMethodInfo}>
-                  <Text style={styles.rzpMethodTitle}>NetBanking</Text>
-                  <Text style={styles.rzpMethodSub}>HDFC, SBI, ICICI, Axis Bank</Text>
-                </View>
-                <Ionicons
-                  name={selectedMethod === 'netbanking' ? "radio-button-on" : "radio-button-off"}
-                  size={18}
-                  color="#0C2340"
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* UPI ID Field if UPI selected */}
-            {selectedMethod === 'upi' && (
-              <View style={styles.rzpUpiBox}>
-                <Text style={styles.rzpInputLabel}>VIRTUAL UPI ID / VPA</Text>
-                <TextInput
-                  style={styles.rzpInput}
-                  value={upiIdInput}
-                  onChangeText={setUpiIdInput}
-                  placeholder="name@okaxis"
-                />
+            ) : (
+              <View style={styles.payInner}>
+                <Text style={[styles.payText, { color: '#003087', marginRight: 6 }]}>Continue with</Text>
+                <PayPalWordmark size={17} dark />
+                <Text style={[styles.payText, { color: '#003087', marginLeft: 6 }]}>· {formatMoney(total, 'USD')}</Text>
               </View>
             )}
+          </Pressable>
 
-            {/* Big Razorpay Blue Pay Button */}
-            <TouchableOpacity
-              style={[styles.rzpPayBtn, isProcessingPayment && styles.btnDisabled]}
-              onPress={handleCompleteInAppPayment}
-              disabled={isProcessingPayment}
-              activeOpacity={0.9}
+          <Text style={styles.finePrint}>
+            {method === 'razorpay'
+              ? 'You\'ll complete payment in Razorpay\'s encrypted window. CouncilX never sees or stores your card or UPI details.'
+              : 'You\'ll be securely redirected to PayPal to approve this payment. Charged in USD; your bank may apply conversion.'}
+          </Text>
+
+          {/* Trust indicators */}
+          <View style={styles.trustRow}>
+            {[
+              { icon: 'lock-closed', text: '256-bit SSL Secure Checkout' },
+              { icon: 'refresh-circle-outline', text: 'Cancel Anytime' },
+              { icon: 'shield-checkmark-outline', text: 'No hidden fees' }
+            ].map(b => (
+              <View key={b.text} style={styles.trustBadge}>
+                <Ionicons name={b.icon} size={13} color={P.success} />
+                <Text style={styles.trustText}>{b.text}</Text>
+              </View>
+            ))}
+          </View>
+          <Text style={styles.pciText}>PCI-DSS compliant processing · Powered by Razorpay & PayPal</Text>
+        </View>
+
+        {/* Order summary column */}
+        <View style={[styles.summary, isWide && { flex: 1 }]}>
+          <Text style={styles.sectionLabel}>ORDER SUMMARY</Text>
+
+          <View style={styles.summaryPlan}>
+            <LinearGradient colors={[P.gold, P.goldDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.summaryIcon}>
+              <Ionicons name={tierKey === 'SYNDICATE' ? 'diamond' : 'sunny'} size={18} color="#1A1408" />
+            </LinearGradient>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.summaryPlanName}>{tier.name}</Text>
+              <Text style={styles.summaryPlanTier}>{tier.tier} membership</Text>
+            </View>
+            <Pressable
+              onPress={() => !processing && setTierKey(tierKey === 'SYNDICATE' ? 'VISHWAGURU' : 'SYNDICATE')}
+              style={({ hovered }) => [styles.changeBtn, SMOOTH, hovered && { borderColor: P.goldLine }]}
             >
-              {isProcessingPayment ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <>
-                  <Ionicons name="lock-closed" size={16} color="#FFFFFF" style={{ marginRight: 8 }} />
-                  <Text style={styles.rzpPayBtnText}>PAY ₹{currentPlan.price} (TEST MODE)</Text>
-                </>
-              )}
-            </TouchableOpacity>
+              <Text style={styles.changeText}>Switch</Text>
+            </Pressable>
+          </View>
 
-            <View style={styles.rzpFooterTrust}>
-              <Ionicons name="shield-checkmark" size={14} color="#555" />
-              <Text style={styles.rzpFooterTrustText}>
-                Razorpay Verified Merchant • 256-Bit SSL Encryption
-              </Text>
+          <View style={styles.cycleMini}>
+            {['monthly', 'annual'].map(c => (
+              <Pressable
+                key={c}
+                onPress={() => !processing && setCycle(c)}
+                style={({ hovered }) => [
+                  styles.cycleMiniSeg,
+                  SMOOTH,
+                  cycle === c ? styles.cycleMiniOn : hovered && { backgroundColor: 'rgba(255,255,255,0.04)' }
+                ]}
+              >
+                <Text style={[styles.cycleMiniText, cycle === c && { color: P.text }]}>
+                  {c === 'annual' ? 'Annually' : 'Monthly'}
+                </Text>
+                {c === 'annual' && (
+                  <Text style={styles.cycleMiniSave}>-{annualSavingsPct(tier, currency)}%</Text>
+                )}
+              </Pressable>
+            ))}
+          </View>
+
+          <View style={styles.lines}>
+            <View style={styles.line}>
+              <Text style={styles.lineLabel}>{cycle === 'annual' ? '12 months × ' + formatMoney(tier.prices.monthly[currency], currency) : '1 month'}</Text>
+              <Text style={styles.lineValue}>{formatMoney(listPrice, currency)}</Text>
+            </View>
+            {discount > 0 && (
+              <View style={styles.line}>
+                <Text style={[styles.lineLabel, { color: P.success }]}>Annual discount</Text>
+                <Text style={[styles.lineValue, { color: P.success }]}>−{formatMoney(discount, currency)}</Text>
+              </View>
+            )}
+            <View style={styles.line}>
+              <Text style={styles.lineLabel}>{currency === 'INR' ? 'GST' : 'Taxes'}</Text>
+              <Text style={styles.lineValue}>Included</Text>
             </View>
           </View>
+
+          <View style={styles.totalRow}>
+            <View>
+              <Text style={styles.totalLabel}>Due today</Text>
+              <Text style={styles.totalCurrency}>{currency === 'INR' ? 'Indian Rupee' : 'US Dollar'}</Text>
+            </View>
+            <Text style={styles.totalValue}>{formatMoney(total, currency)}</Text>
+          </View>
+
+          <Text style={styles.renewText}>
+            Renews {renewDate} at {formatMoney(total, currency)}. Cancel anytime from your profile — no questions asked.
+          </Text>
+
+          <View style={styles.summaryPerks}>
+            {tier.features.slice(0, 3).map(f => (
+              <View key={f} style={styles.summaryPerk}>
+                <Ionicons name="checkmark" size={13} color={P.gold} />
+                <Text style={styles.summaryPerkText}>{f}</Text>
+              </View>
+            ))}
+          </View>
         </View>
-      </Modal>
-    </>
+      </View>
+    </View>
+  );
+
+  /* ------------------------------ Success ------------------------------ */
+  const renderSuccess = () => (
+    <View style={styles.successWrap}>
+      <Animated.View style={{ transform: [{ scale: successScale }] }}>
+        <LinearGradient colors={[P.gold, P.goldDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.successBadge}>
+          <Ionicons name="checkmark" size={38} color="#1A1408" />
+        </LinearGradient>
+      </Animated.View>
+      <Text style={styles.successEyebrow}>PAYMENT CONFIRMED</Text>
+      <Text style={styles.successTitle}>Welcome to the {receipt?.planName}.</Text>
+      <Text style={styles.successSub}>The council is now in session. Every chamber is unlocked for you.</Text>
+
+      <View style={styles.receipt}>
+        {[
+          ['Plan', `${receipt?.planName} · ${receipt?.cycle}`],
+          ['Amount paid', receipt?.amount],
+          ['Paid via', receipt?.gateway],
+          ['Valid until', receipt?.validUntil],
+          ['Transaction ID', receipt?.paymentId]
+        ].map(([k, v]) => (
+          <View key={k} style={styles.receiptRow}>
+            <Text style={styles.receiptKey}>{k}</Text>
+            <Text style={[styles.receiptVal, k === 'Transaction ID' && { fontFamily: MONO, fontSize: 12 }]} numberOfLines={1}>
+              {v}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <Pressable
+        onPress={() => {
+          onSuccess?.();
+          onClose?.();
+        }}
+        style={({ hovered, pressed }) => [
+          styles.payBtn,
+          { alignSelf: 'stretch', maxWidth: 420, marginTop: 28 },
+          SMOOTH,
+          hovered && styles.payBtnHover,
+          pressed && { transform: [{ scale: 0.985 }] }
+        ]}
+      >
+        <LinearGradient colors={[P.gold, P.goldDeep]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={StyleSheet.absoluteFill} />
+        <View style={styles.payInner}>
+          <Text style={styles.payText}>Enter the Chamber</Text>
+          <Ionicons name="arrow-forward" size={16} color="#1A1408" style={{ marginLeft: 8 }} />
+        </View>
+      </Pressable>
+      <Text style={[styles.pciText, { marginTop: 14 }]}>A receipt has been added to your account history.</Text>
+    </View>
+  );
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
+      <View style={styles.overlay}>
+        <View style={styles.sheet}>
+          {/* Ambient glow */}
+          <LinearGradient
+            colors={['rgba(231,200,115,0.10)', 'rgba(7,7,10,0)']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 0.45 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+
+          <View style={styles.topBar}>
+            <View style={styles.brand}>
+              <Text style={styles.brandMark}>Council</Text>
+              <Text style={[styles.brandMark, { color: P.gold }]}>X</Text>
+            </View>
+            <View style={styles.steps}>
+              {['Plan', 'Checkout', 'Done'].map((s, i) => {
+                const idx = step === 'pricing' ? 0 : step === 'checkout' ? 1 : 2;
+                return (
+                  <View key={s} style={styles.stepItem}>
+                    <View style={[styles.stepDot, i <= idx && { backgroundColor: P.gold }]} />
+                    {isWide && <Text style={[styles.stepText, i <= idx && { color: P.text }]}>{s}</Text>}
+                  </View>
+                );
+              })}
+            </View>
+            <Pressable
+              onPress={close}
+              accessibilityLabel="Close"
+              style={({ hovered }) => [styles.closeBtn, SMOOTH, hovered && { backgroundColor: 'rgba(255,255,255,0.08)', transform: [{ rotate: '90deg' }] }]}
+            >
+              <Ionicons name="close" size={18} color={P.textDim} />
+            </Pressable>
+          </View>
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={[styles.scroll, !isWide && { paddingHorizontal: 18 }]}
+          >
+            <Animated.View
+              style={{
+                opacity: fade,
+                transform: [{ translateY: fade.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) }]
+              }}
+            >
+              {step === 'pricing' && renderPricing()}
+              {step === 'checkout' && renderCheckout()}
+              {step === 'success' && renderSuccess()}
+            </Animated.View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
   );
 }
+
+const marks = StyleSheet.create({
+  chip: {
+    height: 22,
+    minWidth: 38,
+    paddingHorizontal: 7,
+    borderRadius: 5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 6,
+    marginTop: 6
+  },
+  tri: {
+    width: 0,
+    height: 0,
+    borderTopWidth: 4,
+    borderBottomWidth: 4,
+    borderLeftWidth: 6,
+    borderTopColor: 'transparent',
+    borderBottomColor: 'transparent'
+  },
+  circle: { width: 12, height: 12, borderRadius: 6 }
+});
 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.88)',
-    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.78)',
     alignItems: 'center',
-    padding: 16,
+    justifyContent: 'center'
   },
-  container: {
+  sheet: {
+    flex: 1,
     width: '100%',
-    maxWidth: 480,
-    maxHeight: '92%',
-    backgroundColor: COLORS.cardBg,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: 'rgba(212, 175, 55, 0.4)',
-    padding: 20,
-    position: 'relative',
-    shadowColor: COLORS.gold,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 10,
+    backgroundColor: P.bg,
+    overflow: 'hidden'
   },
-  closeBtn: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    zIndex: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    justifyContent: 'center',
+  topBar: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 22,
+    paddingTop: Platform.OS === 'ios' ? 54 : 18,
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: P.line
+  },
+  brand: { flexDirection: 'row', alignItems: 'baseline' },
+  brandMark: { color: P.text, fontSize: 18, fontWeight: '800', letterSpacing: -0.4 },
+  steps: { flexDirection: 'row', alignItems: 'center' },
+  stepItem: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 9 },
+  stepDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: P.lineStrong },
+  stepText: { color: P.textFaint, fontSize: 12, fontWeight: '600', marginLeft: 7, letterSpacing: 0.2 },
+  closeBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: P.line
   },
   scroll: {
-    paddingBottom: 10,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 16,
-    paddingTop: 8,
-  },
-  iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 2,
-    borderColor: '#383838',
-    backgroundColor: '#1A1A1A',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  subTitle: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 2,
-    marginBottom: 2,
-  },
-  mainTitle: {
-    color: '#FFF',
-    fontSize: 18,
-    fontWeight: '900',
-    letterSpacing: 1,
-    marginBottom: 8,
-  },
-  badgeLimit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(230, 57, 70, 0.15)',
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(230, 57, 70, 0.4)',
-    gap: 6,
-  },
-  badgeText: {
-    color: '#FF6B6B',
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  expiredBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#D90429',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    gap: 6,
-  },
-  expiredText: {
-    color: '#FFF',
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  referralBanner: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#161616',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    padding: 12,
-    marginBottom: 16,
-  },
-  refInfo: {
-    flex: 1,
-  },
-  refHeading: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  refDesc: {
-    color: '#AAA',
-    fontSize: 10.5,
-    lineHeight: 15,
-  },
-  refCodeText: {
-    color: '#FFF',
-    fontWeight: '800',
-  },
-  copyRefBtn: {
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    gap: 4,
-    marginLeft: 8,
-  },
-  copyRefText: {
-    color: '#000000',
-    fontSize: 10.5,
-    fontWeight: '800',
-  },
-  plansContainer: {
-    gap: 10,
-    marginBottom: 16,
-  },
-  planCard: {
-    backgroundColor: '#181818',
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.08)',
-    padding: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    position: 'relative',
-  },
-  selectedPlanCard: {
-    borderColor: '#FFFFFF',
-    backgroundColor: '#1F1F1F',
-  },
-  annualCard: {
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  discountBadge: {
-    position: 'absolute',
-    top: -9,
-    right: 12,
-    backgroundColor: '#333333',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#555555',
-  },
-  discountText: {
-    color: '#FFF',
-    fontSize: 8.5,
-    fontWeight: '800',
-  },
-  bestValueBadge: {
-    position: 'absolute',
-    top: -9,
-    right: 12,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    gap: 3,
-  },
-  bestValueText: {
-    color: '#000000',
-    fontSize: 8.5,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  planLeft: {
-    flex: 1,
-  },
-  planName: {
-    color: '#FFF',
-    fontSize: 13.5,
-    fontWeight: '800',
-    marginBottom: 2,
-  },
-  planDays: {
-    color: '#888',
-    fontSize: 11,
-  },
-  planRight: {
-    alignItems: 'flex-end',
-  },
-  planRightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  priceWrap: {
-    alignItems: 'flex-end',
-  },
-  buyCardBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E5E5E5',
-  },
-  buyCardBtnText: {
-    color: '#000000',
-    fontSize: 11.5,
-    fontWeight: '800',
-  },
-  slotCard49: {
-    borderColor: '#2A2A2A',
-    backgroundColor: '#161616',
-  },
-  slotBadge49: {
-    position: 'absolute',
-    top: -9,
-    right: 12,
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    gap: 3,
-  },
-  slotBadge49Text: {
-    color: '#000000',
-    fontSize: 8.5,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  planPrice: {
-    color: '#FFF',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  planPriceHighlight: {
-    color: '#FFFFFF',
-    fontSize: 18,
-    fontWeight: '900',
-  },
-  planStrike: {
-    color: '#666',
-    fontSize: 10,
-    textDecorationLine: 'line-through',
-  },
-  perksBox: {
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 10,
-    padding: 10,
-    gap: 6,
-    marginBottom: 16,
-  },
-  perkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  perkText: {
-    color: '#CCC',
-    fontSize: 11,
-    flex: 1,
-  },
-  payButton: {
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  btnDisabled: {
-    opacity: 0.6,
-  },
-  payButtonText: {
-    color: '#000000',
-    fontSize: 13,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  openDirectTestBtn: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  openDirectTestText: {
-    color: '#E5E7EB',
-    fontSize: 11,
-    textDecorationLine: 'underline',
-  },
-  securityText: {
-    color: '#666',
-    fontSize: 10,
-    textAlign: 'center',
-    marginTop: 6,
+    width: '100%',
+    maxWidth: 1040,
+    alignSelf: 'center',
+    paddingHorizontal: 32,
+    paddingTop: 36,
+    paddingBottom: 64
   },
 
-  // Razorpay In-App Sheet Styles
-  rzpOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 16,
-  },
-  rzpModalContainer: {
-    width: '100%',
-    maxWidth: 440,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.4,
-    shadowRadius: 16,
-    elevation: 12,
-  },
-  rzpHeader: {
-    backgroundColor: '#0C2340',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  rzpBrandRow: {
+  // Hero
+  hero: { alignItems: 'center', marginBottom: 36 },
+  eyebrow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-  },
-  rzpLogoBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  rzpBrandName: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 0.5,
-  },
-  rzpBrandSub: {
-    color: '#8BA1B7',
-    fontSize: 8,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  rzpCloseBtn: {
-    padding: 4,
-  },
-  rzpOrderBar: {
-    backgroundColor: '#F5F7FA',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-  rzpOrderTitle: {
-    color: '#0C2340',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  rzpOrderDays: {
-    color: '#64748B',
-    fontSize: 11,
-  },
-  rzpOrderAmount: {
-    color: '#0C2340',
-    fontSize: 17,
-    fontWeight: '900',
-  },
-  rzpTestBanner: {
-    backgroundColor: '#E0F2FE',
-    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: P.goldLine,
+    backgroundColor: P.goldSoft,
+    paddingHorizontal: 12,
     paddingVertical: 6,
+    borderRadius: 999,
+    marginBottom: 22
+  },
+  eyebrowDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: P.gold, marginRight: 8 },
+  eyebrowText: { color: P.gold, fontSize: 11, fontWeight: '700', letterSpacing: 1.8 },
+  heroTitle: {
+    color: P.text,
+    fontFamily: SERIF,
+    fontSize: 48,
+    lineHeight: 56,
+    textAlign: 'center',
+    letterSpacing: -1,
+    fontWeight: '400'
+  },
+  heroSub: {
+    color: P.textDim,
+    fontSize: 16,
+    lineHeight: 24,
+    textAlign: 'center',
+    maxWidth: 520,
+    marginTop: 16
+  },
+  notice: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    marginTop: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: P.panelRaised,
+    borderWidth: 1,
+    borderColor: P.line,
+    maxWidth: 560
   },
-  rzpTestBannerText: {
-    color: '#0C2340',
-    fontSize: 10.5,
-    fontWeight: '700',
+  noticeText: { color: P.textDim, fontSize: 13, marginLeft: 8, flexShrink: 1 },
+
+  // Toggle
+  toggleWrap: { alignItems: 'center', marginTop: 30 },
+  toggleTrack: {
+    flexDirection: 'row',
+    padding: 4,
+    borderRadius: 999,
+    backgroundColor: P.panel,
+    borderWidth: 1,
+    borderColor: P.line
   },
-  rzpMethodsContainer: {
+  toggleThumb: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    width: SEG_W,
+    bottom: 4,
+    borderRadius: 999,
+    backgroundColor: '#1E1E28',
+    borderWidth: 1,
+    borderColor: P.lineStrong
+  },
+  toggleSeg: { width: SEG_W, paddingVertical: 10, alignItems: 'center', borderRadius: 999 },
+  toggleLabel: { color: P.textDim, fontSize: 14, fontWeight: '600' },
+  toggleLabelActive: { color: P.text },
+  savePill: { flexDirection: 'row', alignItems: 'center', marginTop: 12 },
+  savePillText: { color: P.gold, fontSize: 12, fontWeight: '600', marginLeft: 6, letterSpacing: 0.2 },
+
+  // Plans
+  plansRow: { gap: 20 },
+  planCard: {
+    backgroundColor: P.panel,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: P.line,
+    padding: 28,
+    overflow: 'hidden'
+  },
+  planCardFeatured: { borderColor: P.goldLine, backgroundColor: '#0F0E0B' },
+  planHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 },
+  tierChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: P.lineStrong
+  },
+  tierChipFeatured: { borderColor: P.goldLine, backgroundColor: P.goldSoft },
+  tierChipText: { color: P.textDim, fontSize: 10, fontWeight: '800', letterSpacing: 1.6 },
+  popularBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999
+  },
+  popularText: { color: '#1A1408', fontSize: 10, fontWeight: '800', letterSpacing: 1.2, marginLeft: 5 },
+  planName: { color: P.text, fontSize: 24, fontWeight: '700', letterSpacing: -0.6 },
+  planTagline: { color: P.textDim, fontSize: 14, lineHeight: 20, marginTop: 6 },
+  priceRow: { flexDirection: 'row', alignItems: 'flex-end', marginTop: 26 },
+  priceCurrency: { color: P.textDim, fontSize: 22, fontWeight: '500', marginBottom: 8, marginRight: 2 },
+  priceBig: { color: P.text, fontSize: 54, fontWeight: '700', letterSpacing: -2.2, lineHeight: 58 },
+  pricePer: { color: P.textFaint, fontSize: 14, marginBottom: 10, marginLeft: 8 },
+  priceSub: { color: P.textDim, fontSize: 13, marginTop: 6 },
+  priceUsd: { color: P.textFaint, fontSize: 12, marginTop: 4 },
+  cta: {
+    marginTop: 24,
+    height: 50,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden'
+  },
+  ctaGold: {},
+  ctaGoldHover: {
+    shadowColor: P.gold,
+    shadowOpacity: 0.45,
+    shadowRadius: 22,
+    shadowOffset: { width: 0, height: 8 }
+  },
+  ctaGhost: { borderWidth: 1, borderColor: P.lineStrong, backgroundColor: 'rgba(255,255,255,0.02)' },
+  ctaGhostHover: { backgroundColor: 'rgba(255,255,255,0.07)', borderColor: 'rgba(255,255,255,0.28)' },
+  ctaText: { color: P.text, fontSize: 15, fontWeight: '700', letterSpacing: -0.1 },
+  planDivider: { height: 1, backgroundColor: P.line, marginVertical: 24 },
+  featuresHeading: { color: P.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 1.4, marginBottom: 14, textTransform: 'uppercase' },
+  featureRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  featureTick: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+    marginTop: 1
+  },
+  featureTickGold: { backgroundColor: P.gold },
+  featureText: { color: P.textDim, fontSize: 14, lineHeight: 20, flex: 1 },
+
+  reassureRow: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', marginTop: 30 },
+  reassureItem: { flexDirection: 'row', alignItems: 'center', marginHorizontal: 14, marginVertical: 4 },
+  reassureText: { color: P.textDim, fontSize: 13, marginLeft: 7 },
+  referral: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    marginTop: 26,
     padding: 16,
-    gap: 8,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: P.line,
+    backgroundColor: P.panel
   },
-  rzpSectionTitle: {
-    color: '#64748B',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.8,
-    marginBottom: 4,
+  referralText: { color: P.textDim, fontSize: 13, lineHeight: 19, flex: 1, marginHorizontal: 12, minWidth: 200 },
+  referralAction: { color: P.gold, fontSize: 13, fontWeight: '700' },
+
+  // Checkout
+  backLink: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', opacity: 0.8, paddingVertical: 4 },
+  backText: { color: P.textDim, fontSize: 13, fontWeight: '600', marginLeft: 6 },
+  checkoutTitle: {
+    color: P.text,
+    fontFamily: SERIF,
+    fontSize: 34,
+    letterSpacing: -0.6,
+    marginTop: 14,
+    marginBottom: 26
   },
-  rzpMethodRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
+  checkoutGrid: { gap: 20, alignItems: 'stretch' },
+  checkoutBox: {
+    backgroundColor: P.panel,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: P.line,
+    padding: 24
+  },
+  sectionLabel: { color: P.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, marginBottom: 14 },
+  method: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: P.line,
+    backgroundColor: P.panelRaised,
+    padding: 18
+  },
+  methodSelected: {
+    borderColor: P.gold,
+    backgroundColor: '#16140E',
+    shadowColor: P.gold,
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 0 }
+  },
+  methodTop: { flexDirection: 'row', alignItems: 'flex-start' },
+  radio: {
+    width: 20,
+    height: 20,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#FFFFFF',
-  },
-  rzpMethodRowActive: {
-    borderColor: '#0C2340',
-    backgroundColor: '#F8FAFC',
-  },
-  rzpMethodIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: '#EFF6FF',
+    borderColor: P.lineStrong,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 14,
+    marginTop: 2
   },
-  rzpMethodInfo: {
-    flex: 1,
-  },
-  rzpMethodTitle: {
-    color: '#0C2340',
-    fontSize: 12.5,
-    fontWeight: '800',
-  },
-  rzpMethodSub: {
-    color: '#64748B',
-    fontSize: 10.5,
-  },
-  rzpUpiBox: {
-    paddingHorizontal: 16,
-    marginBottom: 12,
-  },
-  rzpInputLabel: {
-    color: '#64748B',
-    fontSize: 9.5,
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  rzpInput: {
+  radioOn: { borderColor: P.gold },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: P.gold },
+  methodTitleRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  methodTitle: { color: P.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2, marginRight: 10 },
+  regionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 13,
-    color: '#0C2340',
-    backgroundColor: '#F8FAFC',
+    borderColor: P.line
   },
-  rzpPayBtn: {
-    backgroundColor: '#0C2340',
-    marginHorizontal: 16,
-    paddingVertical: 14,
+  regionEmoji: { fontSize: 10, marginRight: 4 },
+  regionText: { color: P.textDim, fontSize: 10, fontWeight: '700', letterSpacing: 0.8, textTransform: 'uppercase' },
+  methodSub: { color: P.textDim, fontSize: 13, marginTop: 4 },
+  methodLogo: { marginLeft: 10, marginTop: 1 },
+  methodMarks: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', marginTop: 10, marginLeft: 34 },
+  marksMore: { color: P.textFaint, fontSize: 11, marginTop: 6, marginLeft: 2 },
+  orRow: { flexDirection: 'row', alignItems: 'center', marginVertical: 14 },
+  orLine: { flex: 1, height: 1, backgroundColor: P.line },
+  orText: { color: P.textFaint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6, marginHorizontal: 14 },
+  payBtn: {
+    marginTop: 22,
+    height: 54,
+    borderRadius: 14,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    width: '100%'
+  },
+  payBtnPaypal: { backgroundColor: '#FFC439' },
+  payBtnHover: {
+    transform: [{ translateY: -2 }],
+    shadowColor: P.gold,
+    shadowOpacity: 0.4,
+    shadowRadius: 26,
+    shadowOffset: { width: 0, height: 10 }
+  },
+  payInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  payText: { color: '#1A1408', fontSize: 16, fontWeight: '800', letterSpacing: -0.2 },
+  finePrint: { color: P.textFaint, fontSize: 12, lineHeight: 18, textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
+  trustRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    marginTop: 20,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: P.line
+  },
+  trustBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: 'rgba(52,211,153,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(52,211,153,0.18)',
+    margin: 4
+  },
+  trustText: { color: '#D1FAE5', fontSize: 12, fontWeight: '600', marginLeft: 6 },
+  pciText: { color: P.textFaint, fontSize: 11, textAlign: 'center', marginTop: 12, letterSpacing: 0.2 },
+
+  // Summary
+  summary: {
+    backgroundColor: P.panel,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: P.line,
+    padding: 24,
+    alignSelf: 'stretch'
+  },
+  summaryPlan: { flexDirection: 'row', alignItems: 'center' },
+  summaryIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginRight: 14 },
+  summaryPlanName: { color: P.text, fontSize: 16, fontWeight: '700', letterSpacing: -0.2 },
+  summaryPlanTier: { color: P.textDim, fontSize: 13, marginTop: 2 },
+  changeBtn: { paddingHorizontal: 12, paddingVertical: 7, borderRadius: 8, borderWidth: 1, borderColor: P.lineStrong },
+  changeText: { color: P.text, fontSize: 12, fontWeight: '600' },
+  cycleMini: {
+    flexDirection: 'row',
+    marginTop: 20,
+    padding: 3,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: P.line,
+    backgroundColor: P.bg
+  },
+  cycleMiniSeg: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 9, borderRadius: 8 },
+  cycleMiniOn: { backgroundColor: '#1E1E28' },
+  cycleMiniText: { color: P.textDim, fontSize: 13, fontWeight: '600' },
+  cycleMiniSave: { color: P.gold, fontSize: 11, fontWeight: '700', marginLeft: 6 },
+  lines: { marginTop: 20 },
+  line: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
+  lineLabel: { color: P.textDim, fontSize: 14 },
+  lineValue: { color: P.text, fontSize: 14, fontWeight: '500' },
+  totalRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    borderTopWidth: 1,
+    borderTopColor: P.line,
+    paddingTop: 16,
+    marginTop: 4
+  },
+  totalLabel: { color: P.text, fontSize: 15, fontWeight: '700' },
+  totalCurrency: { color: P.textFaint, fontSize: 12, marginTop: 2 },
+  totalValue: { color: P.text, fontSize: 32, fontWeight: '700', letterSpacing: -1.2 },
+  renewText: { color: P.textFaint, fontSize: 12, lineHeight: 18, marginTop: 14 },
+  summaryPerks: { marginTop: 18, paddingTop: 16, borderTopWidth: 1, borderTopColor: P.line },
+  summaryPerk: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 9 },
+  summaryPerkText: { color: P.textDim, fontSize: 13, lineHeight: 18, marginLeft: 9, flex: 1 },
+
+  // Success
+  successWrap: { alignItems: 'center', paddingTop: 24 },
+  successBadge: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     alignItems: 'center',
-    shadowColor: '#0C2340',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    justifyContent: 'center',
+    shadowColor: P.gold,
+    shadowOpacity: 0.5,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 0 }
   },
-  rzpPayBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
+  successEyebrow: { color: P.gold, fontSize: 11, fontWeight: '700', letterSpacing: 2, marginTop: 26 },
+  successTitle: {
+    color: P.text,
+    fontFamily: SERIF,
+    fontSize: 34,
+    textAlign: 'center',
+    letterSpacing: -0.6,
+    marginTop: 10
   },
-  rzpFooterTrust: {
+  successSub: { color: P.textDim, fontSize: 15, textAlign: 'center', marginTop: 10, maxWidth: 420, lineHeight: 22 },
+  receipt: {
+    maxWidth: 420,
+    width: '100%',
+    marginTop: 28,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: P.line,
+    backgroundColor: P.panel,
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    alignSelf: 'center'
+  },
+  receiptRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 12,
-    gap: 6,
+    justifyContent: 'space-between',
+    paddingVertical: 11,
+    borderBottomWidth: 1,
+    borderBottomColor: P.line
   },
-  rzpFooterTrustText: {
-    color: '#64748B',
-    fontSize: 10,
-    fontWeight: '600',
-  },
+  receiptKey: { color: P.textFaint, fontSize: 13 },
+  receiptVal: { color: P.text, fontSize: 13, fontWeight: '600', marginLeft: 16, flexShrink: 1, textAlign: 'right' }
 });
