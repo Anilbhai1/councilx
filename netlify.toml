@@ -6,6 +6,13 @@
   command = "rm -rf node_modules && npm install --no-audit --no-fund && npx expo export --platform web"
   publish = "dist"
 
+# The Supabase URL and anon key are public by design (Expo inlines EXPO_PUBLIC_*
+# vars into the client bundle, and access is enforced by Supabase RLS), so the
+# secrets scanner should not flag them. Server-only secrets such as the Gemini key
+# must never be referenced from client code; Gemini is called via /api/gemini.
+[build.environment]
+  SECRETS_SCAN_OMIT_KEYS = "EXPO_PUBLIC_SUPABASE_URL,EXPO_PUBLIC_SUPABASE_ANON_KEY"
+
 # Single-page app: serve index.html for client-side routes.
 [[redirects]]
   from = "/*"

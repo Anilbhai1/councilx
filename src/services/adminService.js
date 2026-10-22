@@ -319,7 +319,11 @@ export const adminService = {
       } catch (e) {}
 
       // 4. System Health Checks
-      const hasGeminiKey = Boolean(process.env.EXPO_PUBLIC_GEMINI_API_KEY);
+      let hasGeminiKey = false;
+      try {
+        const geminiHealth = await fetch(`${process.env.EXPO_PUBLIC_API_BASE_URL || ''}/api/gemini`);
+        hasGeminiKey = geminiHealth.ok && Boolean((await geminiHealth.json()).configured);
+      } catch (e) {}
       const isSupabaseOk = isSupabaseConfigured();
       const hasRazorpayKey = Boolean(process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID);
 
