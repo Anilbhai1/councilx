@@ -81,7 +81,6 @@ export const PRICING_TIERS = {
 };
 
 export const SUBSCRIPTION_PLANS = {
-<<<<<<< HEAD
   BHARAT_108: {
     id: '108_bharat',
     name: '108 Bharat Vishwaguru',
@@ -187,8 +186,6 @@ export const SUBSCRIPTION_PLANS = {
       '24/7 Dedicated Sovereign Concierge & Priority VIP Line'
     ]
   },
-  // Legacy aliases for full backward compatibility
-=======
   VISHWAGURU_MONTHLY: {
     id: 'vishwaguru_monthly',
     name: '108 Bharat Vishwaguru · Monthly',
@@ -227,7 +224,6 @@ export const SUBSCRIPTION_PLANS = {
   },
 
   // Legacy plans — kept so existing subscribers and admin gifts keep resolving
->>>>>>> 4a9511bd2ba1aad088a2423249d92feda263201b
   MONTHLY: {
     id: '1_month',
     name: 'Basic Plan (Monthly)',
@@ -679,25 +675,26 @@ export const paymentService = {
    * Process Razorpay payment for plans (supports Basic Plan & Premium Mastermind Plan)
    * Supports both live external checkout IDs and simulated test mode
    */
-<<<<<<< HEAD
-  async processRazorpayPlan(planKey, externalPaymentId = null, currency = 'INR', amountOverride = null, isAnnual = false, externalOrderId = null) {
+  async processRazorpayPlan(planKey, externalPaymentId = null, currencyOrOptions = 'INR', amountOverride = null, isAnnual = false, externalOrderId = null) {
+    let currency = 'INR';
+    let gateway = 'Razorpay';
+    if (typeof currencyOrOptions === 'object' && currencyOrOptions !== null) {
+      gateway = currencyOrOptions.gateway || 'Razorpay';
+      currency = currencyOrOptions.currency || 'INR';
+    } else if (typeof currencyOrOptions === 'string') {
+      currency = currencyOrOptions;
+    }
+
     const plan = SUBSCRIPTION_PLANS[planKey] || 
       Object.values(SUBSCRIPTION_PLANS).find(p => p.id === planKey) || 
       SUBSCRIPTION_PLANS.BASIC;
     const paymentId = externalPaymentId || ('pay_live_' + Math.random().toString(36).substring(2, 12).toUpperCase());
     const orderId = externalOrderId || ('order_live_' + Math.random().toString(36).substring(2, 10));
-=======
-  async processRazorpayPlan(planKey, externalPaymentId = null, { gateway = 'Razorpay', currency = 'INR' } = {}) {
-    const plan = SUBSCRIPTION_PLANS[planKey] || SUBSCRIPTION_PLANS.MONTHLY;
-    const amount = currency === 'USD' && plan.priceUSD ? plan.priceUSD : plan.price;
-    const paymentId = externalPaymentId || ('pay_' + Math.random().toString(36).substring(2, 12));
-    const orderId = 'order_' + Math.random().toString(36).substring(2, 10);
->>>>>>> 4a9511bd2ba1aad088a2423249d92feda263201b
 
     const now = Date.now();
     const durationDays = isAnnual ? (plan.annualDays || 365) : (plan.days || 30);
     const expiresAt = now + (durationDays * 24 * 60 * 60 * 1000);
-    const amount = amountOverride || (isAnnual ? (plan.totalAnnualINR || (plan.priceINR * 12)) : (plan.priceINR || plan.price));
+    const amount = amountOverride || (isAnnual ? (plan.totalAnnualINR || (plan.priceINR ? plan.priceINR * 12 : plan.price)) : (plan.priceINR || plan.price));
 
     // Persist locally
     await AsyncStorage.setItem(STORAGE_KEYS.IS_PREMIUM, 'true');
@@ -713,14 +710,9 @@ export const paymentService = {
       orderId,
       plan: plan.id,
       amount,
-<<<<<<< HEAD
       durationDays,
       currency,
-      gateway: 'Razorpay',
-=======
-      durationDays: plan.days,
-      currency,
->>>>>>> 4a9511bd2ba1aad088a2423249d92feda263201b
+      gateway,
       date: new Date(now).toISOString(),
       expiresAt: new Date(expiresAt).toISOString()
     });
@@ -746,11 +738,7 @@ export const paymentService = {
           razorpay_order_id: orderId,
           plan_type: plan.id,
           amount,
-<<<<<<< HEAD
           duration_days: durationDays,
-=======
-          duration_days: plan.days,
->>>>>>> 4a9511bd2ba1aad088a2423249d92feda263201b
           currency,
           status: 'captured'
         });
@@ -998,8 +986,11 @@ export const paymentService = {
     let planLabel = 'Free Plan';
 
     if (status.isPremium && !status.isExpired) {
-<<<<<<< HEAD
-      if (
+      const activePlan = Object.values(SUBSCRIPTION_PLANS).find(p => p.id === status.planType);
+      if (activePlan) {
+        baseLimit = activePlan.customAgentsLimit;
+        planLabel = activePlan.name;
+      } else if (
         status.planType === '216_syndicate' ||
         status.planType === '1_year' ||
         status.planType === 'premium_mastermind'
@@ -1019,12 +1010,6 @@ export const paymentService = {
       } else {
         baseLimit = Infinity;
         planLabel = '216 Supreme Syndicate';
-=======
-      const activePlan = Object.values(SUBSCRIPTION_PLANS).find(p => p.id === status.planType);
-      if (activePlan) {
-        baseLimit = activePlan.customAgentsLimit;
-        planLabel = activePlan.name;
->>>>>>> 4a9511bd2ba1aad088a2423249d92feda263201b
       }
     }
 
