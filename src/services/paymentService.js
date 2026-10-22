@@ -36,7 +36,89 @@ const BASE_FREE_LIMIT = 5;
 const MICRO_AGENT_PRICE = 49;
 const FREE_CUSTOM_AGENTS_LIMIT = 1;
 
+/**
+ * Public pricing tiers shown on the Pricing & Checkout screen.
+ * Prices are inclusive of all taxes. INR is charged via Razorpay (India),
+ * USD via PayPal (Global).
+ */
+export const PRICING_TIERS = {
+  VISHWAGURU: {
+    key: 'VISHWAGURU',
+    name: '108 Bharat Vishwaguru',
+    tier: 'Basic',
+    tagline: 'The wisdom of Bharat\'s greatest minds, on call 24/7.',
+    prices: {
+      monthly: { INR: 499, USD: 9 },
+      annual: { INR: 3999, USD: 79 }
+    },
+    features: [
+      'Access to the 108 Bharat Vishwaguru Masterminds',
+      'Unlimited 1:1 mastermind conversations',
+      'Up to 15 custom personal agents',
+      'Shareable quote cards & chat history',
+      'Multilingual answers in 10+ languages'
+    ]
+  },
+  SYNDICATE: {
+    key: 'SYNDICATE',
+    name: '216 Supreme Syndicate',
+    tier: 'Premium',
+    tagline: 'The complete boardroom. Every mind. Every debate.',
+    highlight: 'MOST POPULAR',
+    prices: {
+      monthly: { INR: 999, USD: 19 },
+      annual: { INR: 7999, USD: 159 }
+    },
+    features: [
+      'All 216 Masterminds — Bharat & Global',
+      'All-in-One Supreme Council debates',
+      'Unlimited custom personal agents',
+      'Priority AI response speed',
+      'Early access to new masterminds',
+      'Priority concierge support'
+    ]
+  }
+};
+
 export const SUBSCRIPTION_PLANS = {
+  VISHWAGURU_MONTHLY: {
+    id: 'vishwaguru_monthly',
+    name: '108 Bharat Vishwaguru · Monthly',
+    price: PRICING_TIERS.VISHWAGURU.prices.monthly.INR,
+    priceUSD: PRICING_TIERS.VISHWAGURU.prices.monthly.USD,
+    days: 30,
+    customAgentsLimit: 15,
+    agentPerk: 'Create up to 15 Custom Personal Agents'
+  },
+  VISHWAGURU_ANNUAL: {
+    id: 'vishwaguru_annual',
+    name: '108 Bharat Vishwaguru · Annual',
+    price: PRICING_TIERS.VISHWAGURU.prices.annual.INR,
+    priceUSD: PRICING_TIERS.VISHWAGURU.prices.annual.USD,
+    days: 365,
+    customAgentsLimit: 15,
+    agentPerk: 'Create up to 15 Custom Personal Agents'
+  },
+  SYNDICATE_MONTHLY: {
+    id: 'syndicate_monthly',
+    name: '216 Supreme Syndicate · Monthly',
+    price: PRICING_TIERS.SYNDICATE.prices.monthly.INR,
+    priceUSD: PRICING_TIERS.SYNDICATE.prices.monthly.USD,
+    days: 30,
+    customAgentsLimit: Infinity,
+    agentPerk: 'Create UNLIMITED Custom Personal Agents'
+  },
+  SYNDICATE_ANNUAL: {
+    id: 'syndicate_annual',
+    name: '216 Supreme Syndicate · Annual',
+    price: PRICING_TIERS.SYNDICATE.prices.annual.INR,
+    priceUSD: PRICING_TIERS.SYNDICATE.prices.annual.USD,
+    days: 365,
+    customAgentsLimit: Infinity,
+    agentPerk: 'Create UNLIMITED Custom Personal Agents'
+  },
+
+  // Legacy plans — kept so existing subscribers and admin gifts keep resolving
   MONTHLY: {
     id: '1_month',
     name: '1-Month Pro Plan',
@@ -447,8 +529,9 @@ export const paymentService = {
    * Process Razorpay payment for 1 of the 3 plans
    * Supports both live external checkout IDs and simulated test mode
    */
-  async processRazorpayPlan(planKey, externalPaymentId = null) {
+  async processRazorpayPlan(planKey, externalPaymentId = null, { gateway = 'Razorpay', currency = 'INR' } = {}) {
     const plan = SUBSCRIPTION_PLANS[planKey] || SUBSCRIPTION_PLANS.MONTHLY;
+    const amount = currency === 'USD' && plan.priceUSD ? plan.priceUSD : plan.price;
     const paymentId = externalPaymentId || ('pay_' + Math.random().toString(36).substring(2, 12));
     const orderId = 'order_' + Math.random().toString(36).substring(2, 10);
 
@@ -468,9 +551,9 @@ export const paymentService = {
       paymentId,
       orderId,
       plan: plan.id,
-      amount: plan.price,
+      amount,
       durationDays: plan.days,
-      currency: 'INR',
+      currency,
       date: new Date(now).toISOString(),
       expiresAt: new Date(expiresAt).toISOString()
     });
@@ -495,9 +578,9 @@ export const paymentService = {
           razorpay_payment_id: paymentId,
           razorpay_order_id: orderId,
           plan_type: plan.id,
-          amount: plan.price,
+          amount,
           duration_days: plan.days,
-          currency: 'INR',
+          currency,
           status: 'captured'
         });
       } catch (err) {
@@ -512,12 +595,12 @@ export const paymentService = {
         type: 'PAYMENT',
         planName: plan.name,
         planKey: plan.id,
-        amount: plan.price,
+        amount,
         orderId,
         paymentId,
         userEmail: email,
         status: 'PAID',
-        mode: 'Razorpay'
+        mode: gateway
       });
     } catch (e) {}
 
@@ -562,15 +645,10 @@ export const paymentService = {
     let planLabel = 'Free Plan';
 
     if (status.isPremium && !status.isExpired) {
-      if (status.planType === '1_year') {
-        baseLimit = Infinity;
-        planLabel = '1-Year Annual Pro Plan';
-      } else if (status.planType === '6_month') {
-        baseLimit = 50;
-        planLabel = '6-Month Pro Plan';
-      } else if (status.planType === '1_month') {
-        baseLimit = 15;
-        planLabel = '1-Month Pro Plan';
+      const activePlan = Object.values(SUBSCRIPTION_PLANS).find(p => p.id === status.planType);
+      if (activePlan) {
+        baseLimit = activePlan.customAgentsLimit;
+        planLabel = activePlan.name;
       }
     }
 
