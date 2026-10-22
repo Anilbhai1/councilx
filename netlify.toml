@@ -1,0 +1,13 @@
+[build]
+  # The repo contains a committed node_modules from Windows whose bin shims
+  # aren't executable. Remove it and reinstall fresh Linux packages. npm install
+  # (not npm ci) is used because package-lock.json is missing some transitive
+  # Babel entries, which makes npm ci's strict sync check fail.
+  command = "rm -rf node_modules && npm install --no-audit --no-fund && npx expo export --platform web"
+  publish = "dist"
+
+# Single-page app: serve index.html for client-side routes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

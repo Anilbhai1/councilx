@@ -208,6 +208,10 @@ export default function ProfileModal({ visible, onClose, onOpenPaywall, onOpenPr
   if (userStatus?.planType === '1_year') activePlanName = '1-Year Annual Pro Plan (Unlimited Agents)';
   else if (userStatus?.planType === '6_month') activePlanName = '6-Month Pro Plan (50 Custom Agents)';
   else if (userStatus?.planType === '1_month') activePlanName = '1-Month Pro Plan (15 Custom Agents)';
+  else {
+    const matchedPlan = Object.values(SUBSCRIPTION_PLANS).find(p => p.id === userStatus?.planType);
+    if (matchedPlan) activePlanName = matchedPlan.name;
+  }
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
