@@ -116,12 +116,12 @@ export default function CustomAgentsSection({
           return;
         }
         const options = {
-          key: order.key_id,
-          amount: order.amount,
+          key: order.key_id || paymentService.getRazorpayKey(),
+          amount: order.amount || 4900,
           currency: order.currency || 'INR',
           name: 'Council X | The Syndicate',
           description: '+1 Personal Agent Slot Upgrade',
-          order_id: order.id,
+          order_id: order.order_id || order.id || undefined,
           prefill: {
             name: 'Council Member',
             email: 'member@councilx.ai'

@@ -24,11 +24,15 @@ import {
   COUNCILX_USER_SESSION_KEY
 } from './src/services/supabaseClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { pwaService } from './src/services/pwaService';
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
 
   useEffect(() => {
+    // Initialize PWA manifest & service worker lifecycle on web
+    pwaService.init();
+
     let authListenerSubscription = null;
 
     const initializeAuthEngine = async () => {
@@ -124,8 +128,8 @@ export default function App() {
 
                   setIsAuthenticated(true);
                 } else if (event === 'SIGNED_OUT') {
-                  // Only mark unauthenticated if local session was explicitly cleared
-                  const checkLocal = await AsyncStorage.getItem(COUNCILX_USER_SESSION_KEY);
+                  // Only mark unauthenticated if local session was explicitly cleared by user clicking logout
+                  const checkLocal = await getLocalSession();
                   if (!checkLocal) {
                     setIsAuthenticated(false);
                   }
@@ -140,7 +144,9 @@ export default function App() {
 
         // If after checks neither Supabase nor local session is found, default to false
         const finalSession = await getLocalSession();
-        if (!finalSession && legacyLoggedIn !== 'true') {
+        if (finalSession) {
+          setIsAuthenticated(true);
+        } else if (legacyLoggedIn !== 'true') {
           setIsAuthenticated(false);
         }
       } catch (err) {

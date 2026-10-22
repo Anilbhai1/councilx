@@ -250,12 +250,25 @@ export default function CreateAgentModal({ visible, onClose, onAgentCreated, onO
         if (scriptLoaded && window.Razorpay) {
           const razorpayKey = paymentService.getRazorpayKey();
 
+          let orderRes = null;
+          try {
+            orderRes = await paymentService.createRazorpayOrder({
+              amount: 4900,
+              currency: 'INR',
+              planId: 'extra_agent_slot',
+              planName: '+1 Personal Mastermind Slot'
+            });
+          } catch (orderErr) {
+            console.warn('[CouncilX] Slot order creation warning:', orderErr);
+          }
+
           const options = {
             key: razorpayKey,
-            amount: 4900, // ₹49 in paise
+            amount: orderRes?.amount || 4900, // ₹49 in paise
             currency: 'INR',
             name: 'Council X | The Syndicate',
             description: '+1 Personal Mastermind Slot (Lifetime Access)',
+            order_id: orderRes?.order_id || undefined,
             image: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
             handler: async (response) => {
               const res = await paymentService.purchaseExtraAgentSlot(response.razorpay_payment_id);
@@ -606,7 +619,7 @@ export default function CreateAgentModal({ visible, onClose, onAgentCreated, onO
                   {purchasingSlot ? (
                     <ActivityIndicator color="#FFF" />
                   ) : (
-                    <Text style={styles.rzpPayNowText}>SIMULATE PAY ₹49 (TEST MODE)</Text>
+                    <Text style={styles.rzpPayNowText}>CONFIRM & PAY ₹49 (RAZORPAY LIVE)</Text>
                   )}
                 </TouchableOpacity>
               </View>

@@ -56,7 +56,7 @@ export default function AdminDashboardScreen({ navigation }) {
     isPaywallEnabled: true,
     isProModelLockEnabled: true,
     defaultFreeCredits: 5,
-    razorpayMode: 'test',
+    razorpayMode: 'live',
     maintenanceMode: false
   });
   const [savingSettings, setSavingSettings] = useState(false);

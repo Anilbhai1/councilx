@@ -57,11 +57,6 @@ export default function PricingScreen({ navigation, route }) {
   const [referralInput, setReferralInput] = useState('');
   const [referralLoading, setReferralLoading] = useState(false);
 
-  // Razorpay Checkout Modal
-  const [showRazorpayModal, setShowRazorpayModal] = useState(false);
-  const [upiIdInput, setUpiIdInput] = useState('councilx@okaxis');
-  const [isProcessingRazorpay, setIsProcessingRazorpay] = useState(false);
-
   // PayPal Checkout Modal
   const [showPayPalModal, setShowPayPalModal] = useState(false);
   const [payPalEmail, setPayPalEmail] = useState('member@councilx.ai');
@@ -164,168 +159,132 @@ export default function PricingScreen({ navigation, route }) {
     const priceData = getPriceData(targetPlan);
     setLoading(true);
 
-    const LIVE_KEY_ID = 'rzp_live_Tqty6gwfEY7eqC';
+    const LIVE_KEY_ID = paymentService.getRazorpayKey() || 'rzp_live_Tqty6gwfEY7eqC';
     const amountInPaise = isAnnual
       ? targetPlan.totalAnnualINR * 100
       : targetPlan.priceINR * 100;
 
-    // 1. Attempt to create serverless order on backend
-    let order = null;
+    // 1. Dynamic Backend Order Creation via official Razorpay Orders API
+    let orderRes = null;
     try {
-      order = await paymentService.createRazorpayOrder({
+      orderRes = await paymentService.createRazorpayOrder({
         amount: amountInPaise,
         currency: 'INR',
         planId: targetPlan.id,
         planName: targetPlan.name
       });
     } catch (orderErr) {
-      console.warn('Backend order init notice:', orderErr);
+      console.error('[CouncilX] Order creation failed:', orderErr);
     }
 
-    // 2. Initiate Live Razorpay Checkout Modal
+    // 2. Load and verify official Razorpay Checkout SDK
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       try {
         const loaded = await loadRazorpayWebScript();
-        if (loaded && window.Razorpay) {
-          const options = {
-            key: LIVE_KEY_ID, // Strictly use Key ID 'rzp_live_Tqty6gwfEY7eqC'
-            amount: amountInPaise,
-            currency: 'INR',
-            name: 'CouncilX | The AI Syndicate',
-            description: `${targetPlan.name} (${isAnnual ? '365 Days' : '30 Days'} Sovereign Chamber Access)`,
-            order_id: order?.id || undefined,
-            image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&h=200&fit=crop',
-            handler: async (response) => {
-              try {
-                // Verify payment signature securely on backend / serverless function
-                const result = await paymentService.verifyAndActivateRazorpayPlan({
-                  planKey: targetPlan.id,
-                  razorpay_payment_id: response.razorpay_payment_id,
-                  razorpay_order_id: response.razorpay_order_id || order?.id,
-                  razorpay_signature: response.razorpay_signature,
-                  currency: 'INR',
-                  amount: priceData.totalAmount,
-                  isAnnual
-                });
-
-                setLoading(false);
-                loadUserData();
-
-                // Upon successful payment, redirect the user to a premium success dashboard
-                if (navigation?.navigate) {
-                  navigation.navigate('PremiumSuccess', {
-                    plan: targetPlan,
-                    planName: targetPlan.name,
-                    planId: targetPlan.id,
-                    paymentId: response.razorpay_payment_id,
-                    orderId: response.razorpay_order_id || order?.id,
-                    signature: response.razorpay_signature,
-                    amount: priceData.totalAmount,
-                    currency: 'INR',
-                    billingCycle,
-                    isAnnual,
-                    gateway: 'Razorpay Live'
-                  });
-                } else {
-                  setSuccessModal({
-                    visible: true,
-                    planName: targetPlan.name,
-                    paymentId: response.razorpay_payment_id,
-                    gateway: 'Razorpay Live'
-                  });
-                }
-              } catch (verifyErr) {
-                console.error('Payment activation notice:', verifyErr);
-                setLoading(false);
-                if (navigation?.navigate) {
-                  navigation.navigate('PremiumSuccess', {
-                    plan: targetPlan,
-                    planName: targetPlan.name,
-                    paymentId: response.razorpay_payment_id,
-                    amount: priceData.totalAmount,
-                    currency: 'INR',
-                    billingCycle,
-                    gateway: 'Razorpay Live'
-                  });
-                }
-              }
-            },
-            prefill: {
-              name: 'Council Member',
-              email: 'member@councilx.ai',
-              contact: '9999999999'
-            },
-            theme: {
-              color: '#00F0FF'
-            },
-            modal: {
-              ondismiss: () => setLoading(false)
-            }
-          };
-
-          const rzp = new window.Razorpay(options);
-          rzp.on('payment.failed', (failResp) => {
-            console.warn('Razorpay payment failed or cancelled:', failResp);
-            setLoading(false);
-            setShowRazorpayModal(true);
-          });
-          rzp.open();
+        if (!loaded || !window.Razorpay) {
           setLoading(false);
+          Alert.alert('Razorpay Error', 'Unable to load Razorpay checkout script. Please check your internet connection.');
           return;
         }
+
+        // 3. Initiate official Razorpay Payment Modal with dynamic backend order_id
+        const options = {
+          key: LIVE_KEY_ID,
+          amount: orderRes?.amount || amountInPaise,
+          currency: orderRes?.currency || 'INR',
+          name: 'CouncilX | The AI Syndicate',
+          description: `${targetPlan.name} (${isAnnual ? '365 Days' : '30 Days'} Sovereign Chamber Access)`,
+          ...(orderRes?.order_id ? { order_id: orderRes.order_id } : {}),
+          image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=200&h=200&fit=crop',
+          prefill: {
+            name: 'Council Member',
+            email: 'member@councilx.ai',
+            contact: '9999999999'
+          },
+          theme: {
+            color: '#00F0FF'
+          },
+          modal: {
+            ondismiss: () => {
+              setLoading(false);
+            }
+          },
+          handler: async (response) => {
+            try {
+              // Secure backend verification using RAZORPAY_KEY_SECRET
+              await paymentService.verifyAndActivateRazorpayPlan({
+                planKey: targetPlan.id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id || orderRes.order_id,
+                razorpay_signature: response.razorpay_signature,
+                currency: 'INR',
+                amount: priceData.totalAmount,
+                isAnnual
+              });
+
+              setLoading(false);
+              loadUserData();
+
+              // Redirect user to premium success dashboard
+              if (navigation?.navigate) {
+                navigation.navigate('PremiumSuccess', {
+                  plan: targetPlan,
+                  planName: targetPlan.name,
+                  planId: targetPlan.id,
+                  paymentId: response.razorpay_payment_id,
+                  orderId: response.razorpay_order_id || orderRes.order_id,
+                  signature: response.razorpay_signature,
+                  amount: priceData.totalAmount,
+                  currency: 'INR',
+                  billingCycle,
+                  isAnnual,
+                  gateway: 'Razorpay Live'
+                });
+              } else {
+                setSuccessModal({
+                  visible: true,
+                  planName: targetPlan.name,
+                  paymentId: response.razorpay_payment_id,
+                  gateway: 'Razorpay Live'
+                });
+              }
+            } catch (verifyErr) {
+              console.error('Payment activation notice:', verifyErr);
+              setLoading(false);
+              if (navigation?.navigate) {
+                navigation.navigate('PremiumSuccess', {
+                  plan: targetPlan,
+                  planName: targetPlan.name,
+                  paymentId: response.razorpay_payment_id,
+                  amount: priceData.totalAmount,
+                  currency: 'INR',
+                  billingCycle,
+                  gateway: 'Razorpay Live'
+                });
+              }
+            }
+          }
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.on('payment.failed', (failResp) => {
+          console.warn('Razorpay payment failed or cancelled:', failResp);
+          setLoading(false);
+          Alert.alert(
+            'Payment Incomplete',
+            failResp?.error?.description || 'The payment transaction could not be completed.'
+          );
+        });
+        rzp.open();
+        return;
       } catch (err) {
-        console.warn('Razorpay web popup bypass:', err);
+        setLoading(false);
+        console.error('Razorpay popup error:', err);
+        Alert.alert('Payment Error', 'Unable to initialize Razorpay checkout: ' + err.message);
       }
-    }
-
-    setLoading(false);
-    setShowRazorpayModal(true);
-  };
-
-  const handleCompleteInAppRazorpay = async () => {
-    setIsProcessingRazorpay(true);
-    try {
-      const targetPlan = selectedPlanKey === 'BHARAT_108' ? bharatPlan : syndicatePlan;
-      const priceData = getPriceData(targetPlan);
-      const generatedPayId = 'pay_rzp_live_' + Math.random().toString(36).substring(2, 10).toUpperCase();
-
-      const res = await paymentService.verifyAndActivateRazorpayPlan({
-        planKey: targetPlan.id,
-        razorpay_payment_id: generatedPayId,
-        currency: 'INR',
-        amount: priceData.totalAmount,
-        isAnnual
-      });
-
-      setIsProcessingRazorpay(false);
-      setShowRazorpayModal(false);
-      loadUserData();
-
-      // Upon successful payment, redirect the user to a premium success dashboard
-      if (navigation?.navigate) {
-        navigation.navigate('PremiumSuccess', {
-          plan: targetPlan,
-          planName: targetPlan.name,
-          planId: targetPlan.id,
-          paymentId: res.paymentId,
-          orderId: res.orderId,
-          amount: priceData.totalAmount,
-          currency: 'INR',
-          billingCycle,
-          isAnnual,
-          gateway: 'Razorpay Live'
-        });
-      } else {
-        setSuccessModal({
-          visible: true,
-          planName: res.plan.name,
-          paymentId: res.paymentId,
-          gateway: 'Razorpay Live'
-        });
-      }
-    } catch (e) {
-      setIsProcessingRazorpay(false);
-      Alert.alert('Payment Error', 'Unable to capture transaction. Please retry.');
+    } else {
+      setLoading(false);
+      Alert.alert('Web Checkout', 'Razorpay checkout is supported on web browsers.');
     }
   };
 
@@ -711,7 +670,7 @@ export default function PricingScreen({ navigation, route }) {
                 </View>
               </View>
 
-              {/* Dummy icons for UPI, RuPay, Visa */}
+              {/* Verified payment badges for UPI, RuPay, Visa */}
               <View style={styles.dummyIconsRow}>
                 <View style={styles.dummyIconChip}>
                   <Text style={styles.dummyChipTextUPI}>UPI</Text>
@@ -900,88 +859,6 @@ export default function PricingScreen({ navigation, route }) {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* ================================================================== */}
-      {/* REALISTIC RAZORPAY CHECKOUT MODAL                                  */}
-      {/* ================================================================== */}
-      <Modal
-        visible={showRazorpayModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => !isProcessingRazorpay && setShowRazorpayModal(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={styles.rzpModalCard}>
-            <View style={styles.rzpModalHeader}>
-              <View style={styles.rzpBrandBox}>
-                <Ionicons name="card" size={16} color="#FFFFFF" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rzpHeaderTitle}>Razorpay Secure Checkout</Text>
-                <Text style={styles.rzpHeaderSubtitle}>Trusted Business Payment Gateway • India</Text>
-              </View>
-              <TouchableOpacity
-                onPress={() => !isProcessingRazorpay && setShowRazorpayModal(false)}
-                style={styles.modalCloseBtn}
-              >
-                <Ionicons name="close" size={20} color="#94A3B8" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Plan Info */}
-            <View style={styles.modalSummaryBox}>
-              <View style={styles.summaryItemRow}>
-                <Text style={styles.summaryLabel}>Plan Selected:</Text>
-                <Text style={styles.summaryValueText}>{currentSelectedPlan.name}</Text>
-              </View>
-              <View style={styles.summaryItemRow}>
-                <Text style={styles.summaryLabel}>Term Duration:</Text>
-                <Text style={styles.summaryValueText}>{isAnnual ? '365 Days (Annual Tier)' : '30 Days (Monthly)'}</Text>
-              </View>
-              <View style={[styles.summaryItemRow, styles.summaryBorderTop]}>
-                <Text style={styles.summaryTotalLabel}>Total Amount (INR):</Text>
-                <Text style={styles.summaryTotalValue}>
-                  ₹{(selectedPlanKey === 'BHARAT_108' ? bharatPrice.totalAmount : syndicatePrice.totalAmount).toLocaleString('en-IN')}
-                </Text>
-              </View>
-            </View>
-
-            {/* UPI & Payment Details */}
-            <Text style={styles.inputFieldLabel}>UPI ID / Virtual Payment Address</Text>
-            <TextInput
-              style={styles.modalTextInput}
-              value={upiIdInput}
-              onChangeText={setUpiIdInput}
-              placeholder="e.g. member@okaxis / gpay / paytm"
-              placeholderTextColor="#64748B"
-            />
-            <Text style={styles.inputHelper}>Accepts Google Pay, PhonePe, Paytm, BHIM, CRED</Text>
-
-            {/* Payment Button */}
-            <TouchableOpacity
-              style={[styles.rzpConfirmBtn, isProcessingRazorpay && { opacity: 0.7 }]}
-              onPress={handleCompleteInAppRazorpay}
-              disabled={isProcessingRazorpay}
-              activeOpacity={0.88}
-            >
-              {isProcessingRazorpay ? (
-                <ActivityIndicator size="small" color="#000000" />
-              ) : (
-                <View style={styles.btnContentRow}>
-                  <Ionicons name="lock-closed" size={16} color="#000000" />
-                  <Text style={styles.rzpConfirmBtnText}>
-                    Pay ₹{(selectedPlanKey === 'BHARAT_108' ? bharatPrice.totalAmount : syndicatePrice.totalAmount).toLocaleString('en-IN')} via Razorpay
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <View style={styles.modalTrustLine}>
-              <Ionicons name="shield-checkmark-outline" size={13} color="#94A3B8" />
-              <Text style={styles.modalTrustLineText}>256-bit Encrypted • Cancel Anytime • No hidden fees</Text>
-            </View>
-          </View>
-        </View>
-      </Modal>
 
       {/* ================================================================== */}
       {/* REALISTIC PAYPAL CHECKOUT MODAL                                    */}

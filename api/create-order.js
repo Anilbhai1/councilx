@@ -1,10 +1,11 @@
 /**
  * COUNCIL X | THE SYNDICATE
- * Serverless Backend Function: Create Razorpay Order
+ * Serverless Backend Function: Dynamic Razorpay Order Creation
  * 
  * SECURITY COMPLIANCE:
- * - Securely utilizes server-side RAZORPAY_KEY_SECRET to authenticate with Razorpay API.
- * - Secret key is NEVER leaked to client browser.
+ * - Uses server-side RAZORPAY_KEY_SECRET to authenticate directly with Razorpay API (POST /v1/orders).
+ * - Never returns dummy/mock order IDs that cause "Beneficiary UPI ID incorrect" / "random@razorpay" QR errors.
+ * - Secret key is strictly kept server-side and never exposed to the frontend.
  */
 
 module.exports = async function handler(req, res) {
@@ -31,26 +32,31 @@ module.exports = async function handler(req, res) {
     }
     body = body || {};
 
-    const { amount = 199900, currency = 'INR', planId = '216_syndicate', userId = 'anonymous' } = body;
-    const keyId = process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC';
+    const {
+      amount = 199900,
+      currency = 'INR',
+      planId = '216_syndicate',
+      userId = 'anonymous'
+    } = body;
+
+    const keyId = process.env.RAZORPAY_KEY_ID || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC';
     const secret = process.env.RAZORPAY_KEY_SECRET;
 
-    // If secret is not yet configured, create a client-compatible order structure
     if (!secret || secret === 'your_razorpay_key_secret_here') {
-      const mockOrderId = 'order_cx_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-      return res.status(200).json({
-        id: mockOrderId,
-        amount: Number(amount),
-        currency,
-        key_id: keyId,
-        isSimulated: true
+      console.error('[CouncilX Backend Error] RAZORPAY_KEY_SECRET is not configured in backend environment (.env).');
+      return res.status(400).json({
+        success: false,
+        error: 'RAZORPAY_KEY_SECRET is missing or not set in backend environment (.env). Please provide your live Razorpay Key Secret.'
       });
     }
 
     const authHeader = 'Basic ' + Buffer.from(`${keyId}:${secret}`).toString('base64');
     const fetchFn = typeof fetch !== 'undefined' ? fetch : require('node-fetch');
 
-    const receipt = `rcpt_${planId}_${Date.now().toString(36)}`;
+    // Clean receipt string (alphanumeric, max 40 chars)
+    const cleanPlan = String(planId).replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
+    const receipt = `rcpt_${cleanPlan}_${Date.now().toString(36)}`;
+
     const rzpRes = await fetchFn('https://api.razorpay.com/v1/orders', {
       method: 'POST',
       headers: {
@@ -59,12 +65,12 @@ module.exports = async function handler(req, res) {
       },
       body: JSON.stringify({
         amount: Math.round(Number(amount)),
-        currency,
+        currency: currency || 'INR',
         receipt,
         notes: {
-          planId,
-          userId,
-          platform: 'CouncilX Web'
+          planId: String(planId),
+          userId: String(userId),
+          platform: 'CouncilX Web App'
         }
       })
     });
@@ -72,20 +78,18 @@ module.exports = async function handler(req, res) {
     const data = await rzpRes.json();
 
     if (!rzpRes.ok) {
-      console.warn('[CouncilX Razorpay API Notice] Order creation response:', data);
-      // If Razorpay returns error (e.g., live key with test card or authentication required),
-      // return a valid fallback order so the checkout modal can still initialize
-      return res.status(200).json({
-        id: 'order_cx_' + Date.now().toString(36),
-        amount: Number(amount),
-        currency,
-        key_id: keyId,
-        fallback: true
+      console.error('[CouncilX Razorpay API Order Error]', data);
+      return res.status(rzpRes.status || 400).json({
+        success: false,
+        error: data?.error?.description || 'Razorpay rejected order creation. Please verify your Live Key ID & Secret.'
       });
     }
 
+    // Return the dynamic official Razorpay order object
     return res.status(200).json({
+      success: true,
       id: data.id,
+      order_id: data.id,
       amount: data.amount,
       currency: data.currency,
       key_id: keyId,
@@ -95,7 +99,7 @@ module.exports = async function handler(req, res) {
     console.error('[CouncilX Create Order Exception]', err);
     return res.status(500).json({
       success: false,
-      error: err.message || 'Error creating Razorpay order'
+      error: err.message || 'Internal server error while creating Razorpay order.'
     });
   }
 };

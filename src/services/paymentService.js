@@ -219,7 +219,7 @@ export const paymentService = {
   BASE_FREE_LIMIT,
 
   getRazorpayKey() {
-    return process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC';
+    return process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC';
   },
 
   getStripePublishableKey() {
@@ -421,6 +421,20 @@ export const paymentService = {
         '@councilx_lifetime_agents_created'
       ];
       await AsyncStorage.multiRemove(keysToRemove);
+
+      // Cleanly clear web localStorage and cookies upon explicit logout
+      if (typeof window !== 'undefined' && window.localStorage) {
+        keysToRemove.forEach(k => {
+          try { window.localStorage.removeItem(k); } catch (e) {}
+        });
+      }
+      if (typeof document !== 'undefined') {
+        try {
+          document.cookie = 'councilx_session=; max-age=0; path=/; SameSite=Lax';
+          document.cookie = 'councilx_logged_in=; max-age=0; path=/; SameSite=Lax';
+        } catch (e) {}
+      }
+
       if (isSupabaseConfigured()) {
         await supabase.auth.signOut().catch(() => {});
       }
@@ -580,12 +594,12 @@ export const paymentService = {
    * Process Razorpay payment for plans (supports Basic Plan & Premium Mastermind Plan)
    * Supports both live external checkout IDs and simulated test mode
    */
-  async processRazorpayPlan(planKey, externalPaymentId = null, currency = 'INR', amountOverride = null, isAnnual = false) {
+  async processRazorpayPlan(planKey, externalPaymentId = null, currency = 'INR', amountOverride = null, isAnnual = false, externalOrderId = null) {
     const plan = SUBSCRIPTION_PLANS[planKey] || 
       Object.values(SUBSCRIPTION_PLANS).find(p => p.id === planKey) || 
       SUBSCRIPTION_PLANS.BASIC;
-    const paymentId = externalPaymentId || ('pay_rzp_' + Math.random().toString(36).substring(2, 12).toUpperCase());
-    const orderId = 'order_rzp_' + Math.random().toString(36).substring(2, 10);
+    const paymentId = externalPaymentId || ('pay_live_' + Math.random().toString(36).substring(2, 12).toUpperCase());
+    const orderId = externalOrderId || ('order_live_' + Math.random().toString(36).substring(2, 10));
 
     const now = Date.now();
     const durationDays = isAnnual ? (plan.annualDays || 365) : (plan.days || 30);
@@ -1050,46 +1064,80 @@ export const paymentService = {
 
   /**
    * Universal Order Creator for Razorpay Live Checkout
-   * Securely calls serverless /api/create-order endpoint
+   * Securely calls serverless /api/create-order endpoint to generate dynamic Razorpay orders
+   * NEVER returns hardcoded/mock order IDs that cause "Beneficiary UPI ID incorrect" / "random@razorpay" errors
    */
   async createRazorpayOrder({ amount, currency = 'INR', planId = '216_syndicate', planName = '' } = {}) {
     const keyId = this.getRazorpayKey();
     const userId = await this.getUserId();
-    
-    // Attempt backend serverless endpoint first
+    const roundedAmount = Math.round(Number(amount));
+
+    let baseUrl = '';
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        baseUrl = 'http://localhost:3001';
+      } else {
+        baseUrl = window.location.origin;
+      }
+    }
+
     try {
       if (typeof window !== 'undefined' && window.fetch) {
-        const res = await window.fetch('/api/create-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: Math.round(amount),
-            currency,
-            planId,
-            userId
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data && data.id) {
-            return {
-              id: data.id,
-              amount: data.amount || amount,
-              currency: data.currency || currency,
-              key_id: keyId
-            };
-          }
+        let res;
+        try {
+          res = await window.fetch(`${baseUrl}/api/create-order`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: roundedAmount,
+              currency,
+              planId,
+              userId
+            })
+          });
+        } catch (fetchErr) {
+          // Fallback to relative URL if local server port 3001 isn't running
+          res = await window.fetch('/api/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: roundedAmount,
+              currency,
+              planId,
+              userId
+            })
+          });
+        }
+
+        const data = await res.json();
+        if (res.ok && data && (data.order_id || data.id)) {
+          const finalOrderId = data.order_id || data.id;
+          return {
+            success: true,
+            order_id: finalOrderId,
+            id: finalOrderId,
+            amount: data.amount || roundedAmount,
+            currency: data.currency || currency,
+            key_id: keyId
+          };
+        } else {
+          return {
+            success: false,
+            error: data?.error || 'Failed to create order on Razorpay servers.'
+          };
         }
       }
     } catch (err) {
-      console.warn('[CouncilX Notice] Serverless create-order endpoint unreachable, initializing client checkout:', err.message);
+      console.warn('[CouncilX Notice] Serverless create-order endpoint error:', err.message);
+      return {
+        success: false,
+        error: 'Unable to reach backend payment server. Please ensure the backend server is running (npm run server).'
+      };
     }
 
     return {
-      id: 'order_live_' + Math.random().toString(36).substring(2, 10),
-      amount: Math.round(amount),
-      currency,
-      key_id: keyId
+      success: false,
+      error: 'Current environment does not support network requests.'
     };
   },
 
@@ -1118,22 +1166,48 @@ export const paymentService = {
     let verified = false;
     let serverMessage = '';
 
+    let baseUrl = '';
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        baseUrl = 'http://localhost:3001';
+      } else {
+        baseUrl = window.location.origin;
+      }
+    }
+
     // 1. Try serverless endpoint /api/verify-payment
     try {
       if (typeof window !== 'undefined' && window.fetch) {
-        const res = await window.fetch('/api/verify-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            razorpay_payment_id,
-            razorpay_order_id,
-            razorpay_signature,
-            user_id: userId,
-            plan_id,
-            amount,
-            isAnnual
-          })
-        });
+        let res;
+        try {
+          res = await window.fetch(`${baseUrl}/api/verify-payment`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_payment_id,
+              razorpay_order_id,
+              razorpay_signature,
+              user_id: userId,
+              plan_id,
+              amount,
+              isAnnual
+            })
+          });
+        } catch (fetchErr) {
+          res = await window.fetch('/api/verify-payment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_payment_id,
+              razorpay_order_id,
+              razorpay_signature,
+              user_id: userId,
+              plan_id,
+              amount,
+              isAnnual
+            })
+          });
+        }
 
         if (res.ok) {
           const data = await res.json();
@@ -1197,7 +1271,8 @@ export const paymentService = {
       razorpay_payment_id,
       currency,
       amount,
-      isAnnual
+      isAnnual,
+      razorpay_order_id
     );
 
     return {

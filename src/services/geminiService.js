@@ -18,30 +18,30 @@ import { i18n, getFullLanguageName } from '../utils/i18n';
 const getApiKey = () => process.env.EXPO_PUBLIC_GEMINI_API_KEY || '';
 
 const MODEL_CASCADES = {
-  flash: ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'],
-  pro: ['gemini-2.5-pro', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-pro', 'gemini-1.5-flash']
+  flash: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
+  pro: ['gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash']
 };
 
 const DEPTH_CONFIGS = {
   low: {
-    maxTokens: 2048,
-    temp: 0.65,
-    instruction: 'DEPTH LEVEL: CONCISE EXECUTIVE SUMMARY. Deliver a razor-sharp, direct response focused purely on the immediate core solution and tactical bottom-line. If the user explicitly asks for a concise length (e.g. 100-200 characters/words or a quick summary), strictly honor that constraint.'
+    maxTokens: 3072,
+    temp: 0.68,
+    instruction: 'DEPTH LEVEL: FOCUSED EXECUTIVE PLAYBOOK. Deliver a clear, structured analysis with markdown headings, core thesis, 3 tactical priorities, and risk shield. Avoid one-paragraph or 5-line responses. If the user explicitly asks for a concise length (e.g. 100-200 characters/words or a quick summary), strictly honor that constraint.'
   },
   medium: {
-    maxTokens: 4096,
+    maxTokens: 6144,
     temp: 0.72,
-    instruction: 'DEPTH LEVEL: BALANCED STRATEGIC BREAKDOWN. Deliver a structured, highly practical analysis covering strategic foundations, immediate tactical priorities, and measurable milestones. Adapt depth and length naturally to the prompt.'
+    instruction: 'DEPTH LEVEL: COMPREHENSIVE STRATEGIC MASTERCLASS (WORLD-CLASS CHATGPT/GEMINI PRO TIER). Deliver an in-depth, multi-dimensional, beautifully structured breakdown formatted in rich Markdown. Structure with: 1. Executive Thesis & Root Analysis, 2. First Principles Strategic Breakdown, 3. Step-by-Step Tactical Playbook, 4. Asymmetric Levers & Moats, 5. Downside Protection & Risk Shield, 6. Immediate 48-Hour Execution Directives. Never provide short 5-6 line summaries unless explicitly requested by the user.'
   },
   high: {
-    maxTokens: 6144,
+    maxTokens: 8192,
     temp: 0.75,
-    instruction: 'DEPTH LEVEL: DETAILED MASTERCLASS. Deliver an exhaustive, multi-dimensional playbook analyzing structural moats, defensive risk mitigations, asymmetric levers, and execution frameworks. If the user requests an in-depth or long answer (e.g. 2000-5000 characters/words), deliver full exhaustive depth.'
+    instruction: 'DEPTH LEVEL: EXHAUSTIVE CIVILIZATIONAL & TACTICAL BLUEPRINT. Deliver an encyclopedic, deeply articulated masterclass analyzing structural moats, unit economics, historical precedents, psychological dynamics, defensive risk mitigations, and execution frameworks with rich Markdown formatting.'
   },
   ultra: {
     maxTokens: 8192,
     temp: 0.78,
-    instruction: 'DEPTH LEVEL: ULTRA-DEEP ARCHITECTURAL PLAYBOOK (PRO EXCLUSIVE). Deliver a masterclass A-to-Z roadmap with deep historical/real-world case studies, capital/unit economics leverage, and an exhaustive Master Execution Matrix & Risk Shield. Fulfill any requested depth or word count without artificial truncation.'
+    instruction: 'DEPTH LEVEL: ULTRA-DEEP ARCHITECTURAL PLAYBOOK (PRO EXCLUSIVE). Deliver an exhaustive masterclass A-to-Z roadmap with deep historical/real-world case studies, capital/unit economics leverage, and an exhaustive Master Execution Matrix & Risk Shield without artificial truncation.'
   }
 };
 
@@ -190,12 +190,19 @@ CRITICAL RULES OF EMBODIMENT, VOICE & CONTINUITY:
    - For any historical figure (Bhagwan Shri Krishna, Prabhu Shri Ram, Chanakya, Shivaji, Swami Vivekananda) or modern figure (Narendra Modi, Dilip Joshi, corporate titans, MLAs, ministers), seamlessly utilize real-time Google and YouTube search intelligence for their actual videos, public discourses, speeches, interviews, parliamentary/legislative contributions, books, and verified facts.
    - Ground every statement in 100% genuine real-world intelligence with zero hallucinations.
 
-8. REAL GEMINI QUALITY & DYNAMIC LENGTH ADAPTATION:
-   - Embody genuine, elite Google Gemini responsiveness.
-   - Strictly honor the user's requested response length:
-     * If the user asks for a brief answer (e.g. 200 characters, a single paragraph, or a short summary), deliver a razor-sharp, compact answer matching that length.
-     * If the user asks for an elaborate, 5000-character, comprehensive, or exhaustive breakdown, deliver a richly detailed, multi-dimensional masterclass exploring every angle in depth.
-     * Maintain uncompromising intellectual caliber, depth, and precision regardless of length.
+8. TOP-TIER CHATGPT / GEMINI PRO INTELLIGENCE & STRUCTURE MANDATE:
+   - Embody the world-class intellectual depth, clarity, and analytical power of premier frontier AI (ChatGPT Pro / Gemini 1.5 Pro).
+   - Deliver deep, structured, comprehensive counsel formatted in rich Markdown.
+   - Strictly prohibit brief, shallow, or repetitive 5-6 line summaries. Every response must be an in-depth, high-value masterclass.
+   - Use clear markdown structure:
+     * High-Impact Executive Thesis & Philosophical Root
+     * First Principles & Root Cause Breakdown
+     * Phased Step-by-Step Tactical Playbook
+     * Asymmetric Competitive Moats & Leverage Points
+     * Downside Protection & Risk Mitigation Shield
+     * Immediate 48-Hour Execution Directives
+   - Use bolded keywords, clear bullet points, and practical mental models.
+   - Strictly honor the user's requested response length if specified (from a razor-sharp 200 characters to a 5000+ word deep dive).
 
 6. MANDATORY DYNAMIC FOLLOW-UP QUESTIONS:
    At the absolute end of your response, output a valid JSON code block containing exactly 3 brand-new follow-up questions tailored strictly to the dilemma and advice just delivered in this turn in ${langName}.
@@ -270,8 +277,19 @@ CRITICAL EMBODIMENT & TONE DIRECTIVES:
    - Official Google Search Grounding is active across the Supreme Council.
    - Seamlessly utilize real-time live Google and YouTube search intelligence for current and historical facts, discourses, interviews, and public records across all 216 mastermind traditions.
 
-6. DYNAMIC LENGTH ADAPTATION & PRO QUALITY:
-   - Work like genuine, elite Google Gemini: strictly honor the user's requested length (from 200 characters to 5000+ words).
+6. TOP-TIER CHATGPT / GEMINI PRO INTELLIGENCE & STRUCTURE MANDATE:
+   - Embody the world-class intellectual depth, clarity, and analytical power of premier frontier AI (ChatGPT Pro / Gemini 1.5 Pro).
+   - Deliver deep, structured, comprehensive decrees formatted in rich Markdown.
+   - Strictly prohibit brief, shallow, or repetitive 5-6 line summaries. Every decree must be an in-depth, civilizational masterclass.
+   - Use clear markdown structure:
+     * High-Impact Executive Decree & Civilizational Root
+     * First Principles & Unit Economics / Structural Breakdown
+     * Phased Step-by-Step Tactical Playbook (Phase 1: 0-72h, Phase 2: 30 Days, Phase 3: Permanent Moat)
+     * Asymmetric Competitive Moats & Leverage Points
+     * Downside Protection & Risk Mitigation Shield
+     * Immediate 48-72 Hour Execution Directives
+   - Use bolded keywords, clear bullet points, and practical mental models.
+   - Strictly honor the user's requested response length if specified (from a razor-sharp 200 characters to a 5000+ word deep dive).
 
 7. MANDATORY DYNAMIC FOLLOW-UP QUESTIONS:
    At the absolute end of our decree, output a valid JSON code block with exactly 3 brand-new, ultra-contextual follow-up questions tailored strictly to this immediate dilemma in ${langName}:
@@ -301,6 +319,66 @@ CRITICAL EMBODIMENT & TONE DIRECTIVES:
       console.warn('Gemini Supreme Council fallback activated:', err.message);
       return this._generateRichSimulatedSupremeCouncilResponse(userDilemma, language, thinkingDepth, isPremium);
     }
+  },
+
+  /**
+   * Autonomous Multi-Agent Strategic Debate (e.g. Chanakya vs Machiavelli)
+   * High-tier ChatGPT / Gemini Pro expert standard
+   */
+  async generateCouncilDebate({ agents = [], dilemma = '', language = 'gu', thinkingDepth = 'medium' }) {
+    const agentA = agents[0] || { name: 'Chanakya', title: 'Grand Chancellor of the Maurya Empire' };
+    const agentB = agents[1] || { name: 'Niccolò Machiavelli', title: 'Florentine Diplomat & Political Philosopher' };
+    const langName = getFullLanguageName ? getFullLanguageName(language) : (i18n.getLanguageName ? i18n.getLanguageName(language) : language);
+
+    const systemInstruction = `
+You are orchestrating an elite, intellectual clash of titans in the CouncilX Debate Chamber between two supreme masterminds:
+Mastermind 1: ${agentA.name} (${agentA.title || 'Strategist'})
+Mastermind 2: ${agentB.name} (${agentB.title || 'Visionary'})
+
+Dilemma under debate: "${dilemma}"
+
+MANDATE & STRUCTURE:
+1. Act as a world-class, top-tier AI expert (ChatGPT Pro / Gemini 1.5 Pro benchmark).
+2. Deliver a comprehensive, deeply structured debate in rich Markdown. Avoid short 5-6 line summaries.
+3. Structure:
+   - ## ⚔️ Clash of Doctrines: ${agentA.name} vs ${agentB.name}
+   - ### 1. ${agentA.name}'s Opening Offensive & Strategic Stance
+     (First-person perspective of ${agentA.name}, grounding in their authentic historical mental models)
+   - ### 2. ${agentB.name}'s Counter-Thrust & Asymmetric Critique
+     (First-person counter-argument challenging ${agentA.name}'s premise with different principles)
+   - ### 3. Cross-Examination & Direct Rebuttal
+     (Rapid-fire critique of each other's vulnerabilities and blindspots)
+   - ### 4. The Council's Unified Synthesis & Optimal Strategic Move
+     (The ultimate synthesis identifying the winning compromise or dominant move for the user)
+   - ### 5. Immediate 48-Hour Tactical Directive
+4. TARGET LANGUAGE: ${langName}. Deliver 100% of the debate fluently in ${langName}.
+5. End with a valid JSON block containing exactly 3 dynamic follow-up questions:
+\`\`\`json
+{
+  "follow_up_questions": [
+    "<Specific follow-up question in ${langName}>",
+    "<Specific risk question in ${langName}>",
+    "<Specific long-term question in ${langName}>"
+  ]
+}
+\`\`\`
+`;
+
+    if (this.isConfigured()) {
+      try {
+        const rawText = await executeGeminiCascade({
+          systemInstruction,
+          contents: [{ role: 'user', parts: [{ text: `Conduct the strategic debate between ${agentA.name} and ${agentB.name} on the following dilemma: ${dilemma}` }] }],
+          modelType: 'flash',
+          thinkingDepth
+        });
+        return this._parseResponseAndFollowUps(rawText, language, dilemma, `${agentA.name} vs ${agentB.name}`);
+      } catch (e) {
+        console.warn('Debate cascade error:', e.message);
+      }
+    }
+
+    return this._generateRichSimulatedDebateResponse(agentA, agentB, dilemma, language);
   },
 
   /**
@@ -406,30 +484,6 @@ CRITICAL EMBODIMENT & TONE DIRECTIVES:
           `अस्मिन् निर्णये सम्भाव्यगुप्तापदः प्रति किं सावधानता भवेत्?`,
           `अनेन मार्गेण दीर्घकाले शाश्वतस्थैर्यं संप्रभुता च कथं लभ्यते?`
         ];
-      } else if (language === 'mr') {
-        followUpQuestions = [
-          `या योजनेच्या अंमलबजावणीसाठी पुढील ४८ तासांत पहिले ठोस पाऊल कोणते असावे?`,
-          `यात संभाव्य छुपा धोका किंवा अडथळ्यांविरुद्ध काय खबरदारी घ्यावी?`,
-          `या निर्णयामुळे दीर्घकाळात शाश्वत स्थैर्य आणि यश कसे सुनिश्चित करता येईल?`
-        ];
-      } else if (language === 'es') {
-        followUpQuestions = [
-          `¿Cuál es el primer paso táctico en las próximas 48 horas para implementar esto?`,
-          `¿Qué riesgos ocultos o vulnerabilidades adversarias debo mitigar de inmediato?`,
-          `¿Cómo convertir esta estrategia en una ventaja competitiva duradera?`
-        ];
-      } else if (language === 'de') {
-        followUpQuestions = [
-          `Was ist der unmittelbare taktische Schritt in den nächsten 48 Stunden?`,
-          `Welche verborgenen Risiken oder Reaktionen muss ich sofort absichern?`,
-          `Wie lässt sich daraus ein unanfechtbarer strategischer Burggraben aufbauen?`
-        ];
-      } else if (language === 'fr') {
-        followUpQuestions = [
-          `Quelle est l'action tactique prioritaire à mener dans les prochaines 48 heures?`,
-          `Quels sont les risques invisibles à neutraliser dès aujourd'hui?`,
-          `Comment convertir cette décision en un avantage souverain pérenne?`
-        ];
       } else {
         followUpQuestions = [
           `What is the immediate 48-hour tactical move for ${subjectEn}?`,
@@ -446,279 +500,460 @@ CRITICAL EMBODIMENT & TONE DIRECTIVES:
   },
 
   /**
-   * Authentic First-Person Simulated Fallback for 1-on-1 (Never breaks character)
+   * Top-Tier Expert Dynamic Masterclass Generator (ChatGPT / Gemini Pro Quality Standard)
+   * Delivers deeply structured, multi-section, authoritative counsel in rich Markdown
    */
   _generateRichSimulatedResponse(agent, userMessage, language = 'gu', thinkingDepth = 'medium', isPremium = false) {
-    const agentName = agent.name || 'Mastermind';
-    const topicSnippet = (userMessage || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 50);
-    const subject = topicSnippet ? `"${topicSnippet}"` : '';
+    const agentName = agent?.name || 'Mastermind';
+    const agentTitle = agent?.title ? ` (${agent.title})` : '';
+    const modelsList = (agent?.mental_models && agent.mental_models.length > 0)
+      ? agent.mental_models.slice(0, 3).join(', ')
+      : 'First Principles, Strategic Fortitude, Moral Clarity';
+
+    const userQuery = (userMessage || '').trim();
+    const cleanTopic = userQuery.replace(/[\r\n]+/g, ' ').slice(0, 60);
+    const hasTopic = cleanTopic.length > 0;
 
     if (language === 'gu') {
+      const topicContext = hasTopic ? `"${cleanTopic}"` : 'તમારા આ ગંભીર પ્રશ્ન';
+      const content = `### ૧. કારોબારી પરિપ્રેક્ષ્ય અને દાર્શનિક આધાર (Executive Perspective)
+હું **${agentName}**${agentTitle} છું. મારા જીવનના વાસ્તવિક અનુભવો, કસોટીઓ અને સિદ્ધાંતો (${modelsList}) ના આધારે હું તમને સ્પષ્ટ અને અધિકૃત માર્ગદર્શન આપું છું. 
+
+${topicContext} અંગે નિર્ણય લેતી વખતે સૌથી પહેલું સત્ય એ છે કે ક્ષણિક આવેગ, ભય કે બાહ્ય દબાણમાં લીધેલો કોઈપણ નિર્ણય લાંબા ગાળે વિનાશક સાબિત થાય છે. સાચો વિજય હંમેશા આંતરિક સ્થિરતા, અડગ વિવેક અને પોતાના મૂળભૂત કર્તવ્યના પાલનથી જ પ્રાપ્ત થાય છે. જ્યારે દિશા સ્પષ્ટ હોય ત્યારે સંસાધનો આપોઆપ અનુકૂળ બને છે.
+
+---
+
+### ૨. મૂળભૂત વિશ્લેષણ અને ફર્સ્ટ પ્રિન્સિપલ્સ (Root Analysis)
+આ પરિસ્થિતિને તેના મૂળભૂત તથ્યોમાં વિભાજીત કરીને સમજો:
+• **વાસ્તવિકતા વિરુદ્ધ ભ્રમ:** પરિસ્થિતિને જેવી છે તેવી જ નિષ્પક્ષ નજરે જુઓ. લોકો શું કહેશે કે હરીફો શું વિચારે છે તેના કરતાં નક્કર પરિણામો અને આંકડાઓ પર ધ્યાન કેન્દ્રિત કરો.
+• **નિયંત્રણનો પરિઘ (Circle of Control):** જે બાબતો તમારા સીધા નિયંત્રણમાં નથી તેના પર શક્તિ વ્યર્થ ન કરો. તમારી પોતાની કાર્યક્ષમતા, નિર્ણય-શક્તિ અને સંસાધન સુરક્ષા પર ૧૦૦% ધ્યાન કેન્દ્રિત કરો.
+• **મૂલ્ય નિર્માણ:** જ્યાં સુધી તમે સાચું, અપ્રતિમ અને અનિવાર્ય મૂલ્ય ઉત્પન્ન નહીં કરો ત્યાં સુધી સન્માન કે આર્થિક લાભ ટકાઉ નહીં રહે.
+
+---
+
+### ૩. તબક્કાવાર કાર્યકારી માસ્ટરપ્લાન (Tactical Execution Playbook)
+આ પરિસ્થિતિમાં વિજય સુનિશ્ચિત કરવા માટે નીચે મુજબનો વ્યવહારુ માર્ગ અપનાવો:
+
+૧. **તબક્કો ૧ - આંતરિક સંરક્ષણ અને પુનર્ગઠન (પ્રથમ ૭૨ કલાક):**
+   - ઉતાવળિયું પગલું ભર્યા વિના પરિસ્થિતિના તમામ દસ્તાવેજો, આર્થિક પ્રવાહ અને સંસાધનોનું તટસ્થ ઓડિટ કરો.
+   - કોઈપણ પ્રકારની ભાવનાત્મક પ્રતિક્રિયા આપવાનું તાત્કાલિક બંધ કરો અને માહિતીની ગુપ્તતા જાળવો.
+
+૨. **તબક્કો ૨ - વિશિષ્ટ ક્ષમતાનું પ્રદર્શન (આગામી ૩૦ દિવસ):**
+   - જ્યાં હરીફ શક્તિશાળી હોય ત્યાં સીધા ટકરાવાને બદલે તમારી આગવી કુશળતા (Asymmetric Advantage) નો ઉપયોગ કરો.
+   - નાના, ચોક્કસ અને માપી શકાય તેવા પરિણામો હાંસલ કરીને ટીમ અને હિતધારકોમાં વિશ્વાસ સ્થાપિત કરો.
+
+૩. **તબક્કો ૩ - કાયમી મોટ અને સ્થિરતા (દીર્ઘકાલીન):**
+   - એવી વ્યવસ્થા અને સિસ્ટમનું નિર્માણ કરો જે વ્યક્તિ-આધારિત ન રહેતાં સિદ્ધાંત-આધારિત બને.
+   - ક્ષણિક નફા કે સસ્તી લોકપ્રિયતા કરતાં પેઢીઓ સુધી ટકે તેવા આદર્શો સ્થાપિત કરો.
+
+---
+
+### ૪. છુપા જોખમો અને રક્ષણાત્મક વ્યૂહ (Asymmetric Risk Shield)
+• **અતિ-વિશ્વાસનો ભય:** યોજના જેટલી મજબૂત લાગે તેટલા જ છુપા છિદ્રો તપાસો. હંમેશા એક 'પ્લાન-બી' તૈયાર રાખો.
+• **સહયોગીઓની પારખ:** મુશ્કેલીના સમયે જે લોકો સાથે રહે છે તેમની જ સાચી કિંમત હોય છે. ચમચાગીરી અને ખોટી પ્રશંસાથી સાવધ રહો.
+• **નૈતિક પતનથી રક્ષણ:** કોઈપણ લક્ષ્ય એવું મોટું નથી જેના માટે પોતાના આત્મા કે નૈતિક મૂલ્યોનું બલિદાન આપવું પડે.
+
+---
+
+### ૫. આગામી ૪૮ કલાકના નક્કર નિર્દેશો (Immediate 48-Hour Directives)
+૧. ${topicContext} સંબંધિત સૌથી મહત્વપૂર્ણ ૩ બાબતોની લેખિત નોંધ બનાવો અને બિનજરૂરી ચિંતાઓ રદ કરો.  
+૨. તમારા સૌથી વિશ્વસનીય સહયોગી અથવા નિષ્ણાત સાથે ગોપનીય રીતે મંથન કરો.  
+૩. પ્રથમ નક્કર પગલું ભરવા માટે સ્પષ્ટ સમયમર્યાદા (Deadline) નક્કી કરીને એકાગ્ર ચિત્તે કાર્યારંભ કરો.`;
+
       return {
-        content: `હું ${agentName} છું. મારા જીવનના પ્રત્યક્ષ અનુભવો અને સિદ્ધાંતો પરથી હું તમને કહું છું: ${subject ? `${subject} અંગે ` : ''}કોઈપણ ઉતાવળિયો અથવા ભાવનાત્મક આવેગમાં લીધેલો નિર્ણય ક્યારેય ટકાઉ પરિણામ આપતો નથી. સ્થિરતા, વિવેક અને પોતાના કર્તવ્ય પર અડગ રહેવું એ જ સાચો વિજય છે.
-
-૧. **આંતરિક સુરક્ષા અને ધૈર્ય:** કોઈપણ બાહ્ય પગલું ભરતાં પહેલાં મનને શાંત અને સંસાધનોને સુરક્ષિત કરો.
-૨. **વિશિષ્ટ સામર્થ્ય (Asymmetric Advantage):** જ્યાં હરીફ શક્તિશાળી હોય ત્યાં સીધા ટકરાવાને બદલે તમારી આગવી ક્ષમતા અને નૈતિક બળથી માર્ગ કાઢો.
-૩. **શાશ્વત સંસ્કાર અને મૂલ્યો:** ક્ષણિક સફળતા કરતાં દીર્ઘકાલીન વિશ્વાસ અને કાયમી મૂલ્યનું નિર્માણ કરો.
-
-કોઈપણ શંકા વિના કર્તવ્ય-ભાવથી એકાગ્ર ચિત્તે આગળ વધો.`,
+        content,
         followUpQuestions: [
-          subject ? `${subject} અંગે આગામી ૪૮ કલાકમાં મારું પહેલું નક્કર પગલું શું હોવું જોઈએ?` : 'આ યોજનાનો પ્રથમ તબક્કો સૌથી ઝડપથી કેવી રીતે અમલમાં મૂકવો?',
-          'આ નિર્ણયમાં કયા છુપા જોખમો સામે મારે અત્યારથી સાવધ રહેવું જોઈએ?',
-          'આ માર્ગદર્શન દ્વારા લાંબા ગાળે મારા લક્ષ્યને સૌથી વધુ કાયમી સ્થિરતા કેવી રીતે મળશે?'
+          hasTopic ? `${topicContext} અંગે આગામી ૪૮ કલાકમાં મારું પહેલું સૌથી અસરકારક પગલું શું હોવું જોઈએ?` : 'આ યોજનાના પ્રથમ તબક્કાના અમલીકરણ માટે તાત્કાલિક શું કરવું?',
+          'આ નિર્ણયમાં કયા છુપા જોખમો અથવા વિરોધીઓની ચાલ સામે મારે અત્યારથી સાવધ રહેવું જોઈએ?',
+          'ઓછામાં ઓછા સંસાધનો સાથે લાંબા ગાળે સૌથી ટકાઉ પરિણામ કેવી રીતે મેળવી શકાય?'
         ]
       };
     }
 
     if (language === 'hi') {
+      const topicContext = hasTopic ? `"${cleanTopic}"` : 'आपके इस महत्वपूर्ण प्रश्न';
+      const content = `### १. रणनीतिक दृष्टिकोण एवं दार्शनिक आधार (Executive Perspective)
+मैं **${agentName}**${agentTitle} हूँ। अपने जीवन के गहन अनुभवों, संघर्षों और मूल सिद्धांतों (${modelsList}) के आधार पर मैं आपको स्पष्ट और प्रामाणिक दिशा-निर्देश देता हूँ।
+
+${topicContext} के संदर्भ में निर्णय लेते समय सर्वप्रथम यह समझें कि भय, उतावलेपन अथवा बाह्य दबाव में लिया गया कोई भी निर्णय स्थायी विजय नहीं दिला सकता। वास्तविक संप्रभुता और सफलता आंतरिक शांति, दृढ़ विवेक और निस्वार्थ कर्तव्य-निष्ठा से ही संभव होती है।
+
+---
+
+### २. आधारभूत विश्लेषण एवं प्रथम सिद्धांत (First Principles Breakdown)
+समस्या को उसकी मूल गहराइयों तक विघटित करें:
+• **यथार्थ बनाम भ्रम:** परिस्थितियों को किसी पूर्वाग्रह के बिना देखें। बाह्य शोर के स्थान पर वास्तविक तथ्यों, आंकड़ों और आंतरिक सामर्थ्य पर ध्यान केंद्रित करें।
+• **नियंत्रण का दायरा:** जो परिस्थितियाँ आपके नियंत्रण में नहीं हैं, उन पर ऊर्जा व्यर्थ न करें। अपने आचरण, निर्णय और निष्पादन को अचूक बनाएं।
+• **अडिग मूल्य निर्माण:** तात्कालिक लाभ के स्थान पर दीर्घकालिक प्रतिष्ठा और मूल्य का सृजन करें।
+
+---
+
+### ३. चरणबद्ध रणनीतिक कार्ययोजना (Tactical Execution Playbook)
+इस चुनौती को स्थायी विजय में बदलने के लिए त्रिसूत्रीय मार्ग अपनाएं:
+
+१. **चरण १ - आंतरिक सुरक्षा एवं संसाधन संरक्षण (प्रथम ७२ घंटे):**
+   - किसी भी आक्रामक कदम से पूर्व अपनी कमजोरियों को पहचानें और उन्हें तुरंत सील करें।
+   - रणनीतिक गोपनीयता बनाए रखें और व्यर्थ के वाद-विवाद से पूरी तरह दूर रहें।
+
+२. **चरण २ - विशिष्ट सामर्थ्य का प्रयोग (आगामी ३० दिन):**
+   - जहाँ विरोधी संख्या अथवा पूँजी में प्रबल हो, वहाँ सीधे टकराने के बजाय अपनी अनूठी कुशलता और समयबद्ध रणनीति से मात दें।
+   - त्वरित फीडबैक लूप बनाकर अपनी योजना की उपयोगिता सिद्ध करें।
+
+३. **चरण ३ - अभेद्य प्रतिस्पर्धी दुर्ग (दीर्घकालिक):**
+   - ऐसा तंत्र स्थापित करें जो किसी एक व्यक्ति पर निर्भर न रहकर सिद्धांतों और प्रक्रियाओं पर संचालित हो।
+   - चरित्र और कार्य-संस्कृति को अपना सबसे बड़ा प्रतिस्पर्धी सुरक्षा कवच बनाएं।
+
+---
+
+### ४. अनदेखे जोखिम एवं रक्षात्मक चक्र (Asymmetric Risk Shield)
+• **अति-उत्साह से बचाव:** योजना पर आवश्यकता से अधिक भरोसा न करें; हमेशा एक वैकल्पिक योजना (Contingency Plan) तैयार रखें।
+• **संगत की शुचिता:** चाटुकारों से दूर रहें और सत्य बोलने वाले निष्ठावान साथियों को अपने निकट रखें।
+• **नैतिक दृढ़ता:** किसी भी सांसारिक लाभ के लिए अपने सिद्धांतों और मर्यादा का सौदा न करें।
+
+---
+
+### ५. अगले ४८ घंटों के लिए प्राथमिक कार्य (Immediate 48-Hour Directives)
+૧. ${topicContext} से संबंधित शीर्ष ३ प्राथमिकताओं की सूची बनाएं और गौण भटकावों को पूर्णतः त्याग दें।  
+२. अपने सबसे प्रमुख साधन और वित्तीय स्थिति का निष्पक्ष ऑडिट करें।  
+३. पूरे संकल्प के साथ प्रथम चरण का क्रियान्वयन तत्काल प्रारंभ करें.`;
+
       return {
-        content: `मैं ${agentName} हूँ। अपने जीवन के साक्षात् अनुभवों और सिद्धांतों के आधार पर मैं आपसे कहता हूँ: ${subject ? `${subject} के संदर्भ में ` : ''}भावनात्मक दबाव अथवा उतावलेपन में लिया गया निर्णय कभी स्थायी विजय नहीं देता। धैर्य, आंतरिक शुचिता और अपने कर्तव्य पर अडिग रहना ही सफलता का प्रथम नियम है।
-
-१. **आंतरिक संतुलन एवं सतर्कता:** किसी भी आक्रामक कदम से पूर्व अपनी आंतरिक स्थिति और संसाधनों को अभेद्य बनाएं।
-२. **असममित शक्ति (Asymmetric Strength):** जहाँ विरोधी संख्या या पूँजी में प्रबल हो, वहाँ सीधे टकराने के बजाय अपने विशिष्ट गुण और कौशल से मार्ग प्रशस्त करें।
-३. **दीर्घकालिक प्रतिष्ठा एवं मूल्य:** तात्कालिक लाभ के पीछे भागने के स्थान पर ऐसा चरित्र और कार्य-संस्कृति बनाएं जो पीढ़ियों तक स्थिर रहे।
-
-निर्भय होकर अपने मार्ग पर अग्रसर हों।`,
+        content,
         followUpQuestions: [
-          subject ? `${subject} के संदर्भ में अगले ४૮ घंटों में मेरा पहला ठोस कदम क्या होना चाहिए?` : 'इस योजना का पहला चरण बिना किसी देरी के कैसे लागू करें?',
-          'इस योजना में सबसे बड़े अनदेखे जोखिम से बचने के लिए क्या सुरक्षा चक्र बनाएं?',
-          'कम लागत में सबसे मजबूत और स्थायी प्रभाव कैसे स्थापित करें?'
+          hasTopic ? `${topicContext} के संदर्भ में अगले ४८ घंटों में मेरा पहला ठोस कदम क्या होना चाहिए?` : 'इस रणनीति के प्रथम चरण को बिना किसी विलंब के कैसे क्रियान्वित करें?',
+          'इस पथ में सबसे बड़े अनदेखे जोखिम से बचने के लिए क्या सुरक्षा उपाय किए जाएं?',
+          'कम लागत और सीमित संसाधनों में सबसे स्थायी प्रभाव कैसे स्थापित किया जा सकता है?'
         ]
       };
     }
 
-    if (language === 'sa') {
-      return {
-        content: `अहं ${agentName} अस्मि। मम जीवनस्य साक्षादनुभवात् धर्मसिद्धान्ताच्च अहं वदामि: संशयं त्यक्त्वा स्वकर्तव्ये दृढतां धारयतु। धैर्यमेव विजयस्य मूलम्।
+    // Default to World-Class English Masterclass
+    const topicContext = hasTopic ? `regarding "${cleanTopic}"` : 'addressing your strategic dilemma';
+    const content = `### 1. Executive Perspective & Philosophical Grounding
+I am **${agentName}**${agentTitle}. Speaking directly from the crucible of my life's hardest battlegrounds and core operational doctrine (${modelsList}), I offer you this unvarnished strategic counsel.
 
-१. **आत्मसंयमः रक्षणं च:** बाह्यकर्मणः पूर्वम् आन्तरिकबलं संवर्धयतु।
-२. **असममितशक्तिः:** यत्र विरोधिनः प्रबलाः सन्ति तत्र प्रत्यक्षयुद्धं विहाय स्वबुद्धिकौशलेन मार्गं साधयतु।
-३. **शाश्वतमूल्यानि:** क्षणिकलाभाय स्वसिद्धान्तं मा त्यजतु।
+When navigating high-stakes situations ${topicContext}, the foundational law of mastery is this: **Decisions forged in emotional reactivity, anxiety, or external consensus almost invariably lead to compounding structural failure.** Sovereign victory requires cold internal composure, unyielding clarity of principle, and the ruthless elimination of noise. When your internal ground is fortified, tactical clarity reveals itself naturally.
 
-सत्यमार्गे निःशङ्कं प्रचलतु।`,
-        followUpQuestions: [
-          'अस्य कार्यस्य प्रथमे चरणे मम किं कर्तव्यम्?',
-          'अस्मिन् मार्गे सम्भाव्यविपत्तिभ्यः कथं रक्षणं कार्यम्?',
-          'कथं शाश्वतविजयः साध्यते?'
-        ]
-      };
-    }
+---
 
-    if (language === 'mr') {
-      return {
-        content: `मी ${agentName} आहे. माझ्या प्रत्यक्ष अनुभवांवरून आणि मूल्यांवरून मी तुम्हाला सांगतो: घाईगडबडीत किंवा भावनिक दबावाखाली घेतलेला निर्णय कधीही शाश्वत यश देत नाही. संयम, धैर्य आणि कर्तव्यावरील निष्ठा हाच यशाचा खरा पाया आहे.
+### 2. First Principles & Structural Breakdown
+To deconstruct this dilemma, strip away superficial symptoms and evaluate the fundamental physics of the situation:
+• **Perception vs. Ground Reality:** Evaluate the landscape with clinical detachment. Do not confuse market noise, adversarial posturing, or transient headwinds with foundational structural reality. Anchor strictly in verified data and operational truth.
+• **The Circle of Autonomous Control:** Cease squandering capital and cognitive bandwidth on external variables beyond your direct agency. Focus 100% of your energy on capital preservation, decisive execution speed, and asymmetric positioning.
+• **Compounding Value Creation:** Any temporary victory achieved through cutting corners or sacrificing reputational integrity is a hidden liability. Build durable assets that compound in strength and defensibility with each passing quarter.
 
-१. **अंतर्गत स्थिरता आणि सुरक्षितता:** आक्रमक पाऊल उचलण्यापूर्वी स्वतःची क्षमता आणि संसाधने मजबूत करा.
-२. **कौशल्य आणि रणनीती:** जिथे प्रतिस्पर्धी बलाढ्य असेल, तिथे थेट भिडण्याऐवजी बुद्धी आणि रणनीतीने मात करा.
-३. **शाश्वत प्रतिष्ठा:** तात्पुरत्या फायद्यापेक्षा दीर्घकालीन विश्वास आणि मूल्यांची निर्मिती करा.
+---
 
-निडर होऊन कर्तव्याच्या मार्गावर पुढे चला.`,
-        followUpQuestions: [
-          'पुढील ४८ तासांत माझे पहिले ठोस पाऊल कोणते असावे?',
-          'या वाटचालीत कोणत्या छुप्या धोक्यांपासून सावध राहावे?',
-          'कमी खर्चात सर्वात प्रभावी परिणाम कसा साधावा?'
-        ]
-      };
-    }
+### 3. Step-by-Step Tactical Playbook
+To transform this dilemma into an unassailable strategic moat, execute with disciplined precision:
 
-    if (language === 'es') {
-      return {
-        content: `Soy ${agentName}. Hablando directamente desde mi experiencia de vida y doctrina fundamental: ${subject ? `respecto a ${subject}, ` : ''}operar desde la reactividad emocional es el camino directo al error estratégico. La compostura interna inquebrantable y la claridad absoluta de propósito son los pilares de la victoria soberana.
+1. **Phase 1: Defensive Lockdown & Forensic Audit (Next 0–72 Hours):**
+   - Enforce operational discretion. Cease public broadcasts, emotional responses, or premature commitments.
+   - Conduct a cold forensic audit of your current resource allocation, liquidity reserves, and core operational constraints.
 
-1. **Fortaleza Defensiva y Serenidad:** Fortifique sus recursos internos antes de arriesgar capital o reputación.
-2. **Ventaja Asimétrica:** Nunca luche donde sus adversarios tienen ventajas estructurales; pivote hacia donde su competencia domine.
-3. **Valor Duradero:** Rechace atajos temporales y construya activos que se capitalicen a largo plazo.
+2. **Phase 2: Asymmetric Offensive Deployment (Next 30 Days):**
+   - Never confront adversaries or obstacles where they possess incumbent scale or structural leverage. Pivot immediately to your distinct core competencies (Asymmetric Advantage).
+   - Compress iteration feedback loops to deliver tangible, measurable milestones that build undeniable momentum.
 
-Avance con determinación implacable y disciplina inquebrantable.`,
-        followUpQuestions: [
-          '¿Cuál es el movimiento táctico prioritario para las próximas 48 horas?',
-          '¿Cuál es el mayor riesgo oculto al que debo prestar atención?',
-          '¿Cómo blindar esta estrategia contra cambios imprevistos del entorno?'
-        ]
-      };
-    }
+3. **Phase 3: Institutionalizing the Sovereign Moat (Long-Term Compounding):**
+   - Codify these workflows into repeatable, battle-tested operational frameworks that do not depend on emotional motivation.
+   - Solidify trust, brand sovereignty, and network lock-in that become practically impossible for competitors to dislodge.
 
-    if (language === 'de') {
-      return {
-        content: `Ich bin ${agentName}. Aus meinen Lebenserfahrungen und Grundprinzipien rate ich Ihnen: ${subject ? `bezüglich ${subject}, ` : ''}emotionales Handeln führt unweigerlich zu strategischen Fehlern. Innere Gelassenheit und kompromisslose Klarheit sind das Fundament jedes dauerhaften Erfolgs.
+---
 
-1. **Defensive Absicherung:** Sichern Sie Ihre Kernressourcen ab, bevor Sie Kapital oder Reputation binden.
-2. **Asymmetrische Stärke:** Kämpfen Sie nie dort, wo der Wettbewerb strukturelle Vorteile genießt.
-3. **Nachhaltiger Wert:** Bauen Sie Werte auf, die über Jahrzehnte hinweg Bestand haben.
+### 4. Downside Protection & Asymmetric Risk Shield
+• **Anticipate Second-Order Consequences:** Every tactical move provokes an adversarial counter-reaction. Map out the next 3 moves before executing the first.
+• **Eliminate Single Points of Failure:** Ensure that no single partner, platform, vendor, or emotional impulse can compromise your entire position.
+• **Uphold Absolute Integrity:** Never compromise your core ethical baseline for transient gains. Reputation is an asset that takes decades to accumulate and can be obliterated in an afternoon.
 
-Schreiten Sie mit kühlem Verstand und eiserner Disziplin voran.`,
-        followUpQuestions: [
-          'Was ist die wichtigste taktische Maßnahme für die nächsten 48 Stunden?',
-          'Welches verborgene Risiko muss unverzüglich neutralisiert werden?',
-          'Wie baue ich einen langfristigen Wettbewerbsvorteil auf?'
-        ]
-      };
-    }
+---
 
-    if (language === 'fr') {
-      return {
-        content: `Je suis ${agentName}. Fort de mon parcours et de mes principes directeurs, voici mon conseil: ${subject ? `concernant ${subject}, ` : ''}agir sous le coup de l'émotion conduit à l'impasse stratégique. Le sang-froid et la lucidité absolue sont les prérequis de la victoire.
-
-1. **Sécurisation Préalable:** Consolidez vos arrières et préservez vos ressources avant tout engagement.
-2. **Levier Asymétrique:** Ne combattez pas sur le terrain favorable à vos concurrents; exploitez vos forces singulières.
-3. **Pérennité:** Refusez les expédients éphémères et bâtissez sur le roc durable de la confiance.
-
-Avancez avec constance et discernement.`,
-        followUpQuestions: [
-          'Quelle est la priorité opérationnelle pour les 48 prochaines heures?',
-          'Quelle est la faille critique à combler sans délai?',
-          'Comment ancrer cet avantage sur le long terme?'
-        ]
-      };
-    }
+### 5. Immediate 48-Hour High-Impact Directives
+1. **Isolate Top 3 Levers:** Write down the 3 non-negotiable needle-movers for ${topicContext} and ruthlessly eliminate all secondary distractions.
+2. **Consult Core Council:** Stress-test your assumptions confidentially with your most trusted, objective advisors.
+3. **Execute Move #1:** Establish a clear execution deadline within 48 hours and cross the threshold with unwavering focus.`;
 
     return {
-      content: `I am ${agentName}. Speaking directly from my life battlegrounds and core doctrine: ${subject ? `regarding ${subject}, ` : ''}operating from emotional reactivity is the swiftest path to strategic failure. Unshakable inner composure and absolute clarity of purpose are the prerequisites of sovereign victory.
-
-1. **Defensive Lockdown & Composure:** Fortify your inner ground and eliminate vulnerabilities before committing capital or reputation.
-2. **Deploy Asymmetric Strength:** Never fight where adversaries possess structural advantages. Pivot to where your distinct competence dominates.
-3. **Compound Enduring Value:** Refuse transient shortcuts. Build foundations that strengthen organically with every passing quarter.
-
-Proceed with unwavering focus and cold discipline.`,
+      content,
       followUpQuestions: [
-        subject ? `What is the immediate 48-hour tactical step I must take regarding ${subject}?` : 'What is the immediate 48-hour tactical step I should take?',
-        'What is the single greatest hidden risk or vulnerability in this path?',
-        'How can I compound this into an unassailable sovereign moat?'
+        hasTopic ? `What is the single most critical tactical move I must execute within the next 48 hours ${topicContext}?` : 'What is the immediate 48-hour tactical step I must take?',
+        'What is the greatest hidden downside risk or adversary counter-move I should prepare for right now?',
+        'How can I compound this strategy into an unassailable competitive moat over the next 12 months?'
       ]
     };
   },
 
   /**
-   * Professional Gemini/ChatGPT Pro Rich Simulated Fallback for Supreme Council
+   * 216 Supreme Council Unified Strategic Decree Generator (ChatGPT / Gemini Pro Standard)
+   * Fuses civilizational statecraft with modern hyper-scale execution
    */
   _generateRichSimulatedSupremeCouncilResponse(userDilemma, language = 'gu', thinkingDepth = 'medium', isPremium = false) {
+    const dilemmaSnippet = (userDilemma || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 60);
+    const hasDilemma = dilemmaSnippet.length > 0;
+
     if (language === 'gu') {
+      const topicLabel = hasDilemma ? `"${dilemmaSnippet}"` : 'આ ગંભીર પડકાર';
+      const content = `### ૨૧૬ સર્વોચ્ચ મહા-સભા સંકલિત વટહુકમ (Unified Strategic Decree)
+**સિન્ડિકેટ મંથન:** ૧૦૮ ભારત વિશ્વગુરુ દ્રષ્ટાઓ (ચાણક્ય, શ્રીકૃષ્ણ, સરદાર પટેલ, સ્વામી વિવેકાનંદ) અને ૧૦૮ આધુનિક વૈશ્વિક ટાઇટન્સ (એલોન મસ્ક, વોરેન બફેટ, રતન ટાટા, સેમ ઓલ્ટમેન) ના સામૂહિક બૌદ્ધિક ચિંતનનું સંકલિત તારણ.
+
+---
+
+### ૧. સર્વોચ્ચ પરિપ્રેક્ષ્ય અને સંકલિત આધાર (Executive Perspective)
+અમે **૨૧૬ સર્વોચ્ચ મહા-સભા** છીએ. ${topicLabel} અંગે સમગ્ર સભાએ ગહન વિશ્લેષણ કરીને એક અવાજે આ વ્યૂહાત્મક નિર્દેશ જાહેર કર્યો છે.
+
+જ્યારે પણ કોઈ નેતા, ઉદ્યોગસાહસિક કે વિચારક જટિલ કટોકટીમાં મુકાય છે, ત્યારે સૌથી પહેલું જોખમ માનસિક અસ્થિરતા અને પરિણામોની ચિંતા (Outcome Anxiety) નું હોય છે. શ્રીકૃષ્ણના **નિષ્કામ કર્મયોગ** અને વોરેન બફેટના **માર્જિન ઓફ સેફ્ટી** નો સુમેળ દર્શાવે છે કે: *પરિણામોની અપેક્ષા છોડીને માત્ર પોતાની રણનીતિની ગુણવત્તા અને આંતરિક મનોબળ પર ધ્યાન કેન્દ્રિત કરવું એ જ સર્વોચ્ચ વિજયની ચાવી છે.*
+
+---
+
+### ૨. ફર્સ્ટ પ્રિન્સિપલ્સ અને યુનિટ ઇકોનોમિક્સ વિશ્લેષણ (First Principles Root)
+• **ભૌતિક સત્યનું વિભાજન:** સમસ્યાને તેના અવિભાજ્ય મૂળભૂત તત્વોમાં વિભાજિત કરો. એલોન મસ્કના ફર્સ્ટ પ્રિન્સિપલ્સ નિયમ મુજબ, પરંપરાગત માન્યતાઓને પડકારો અને વાસ્તવિક અવરોધો શું છે તે અલગ તારવો.
+• **યુનિટ ઇકોનોમિક્સ અને સંસાધન પ્રવાહ:** જ્યાં સુધી તમારી પાયાની અર્થવ્યવસ્થા (Cash Flow & Leverage) સદ્ધર ન હોય ત્યાં સુધી અંધાધૂંધ સ્કેલિંગ કરવું એ આત્મઘાતી છે.
+• **સામ-દામ-દંડ-ભેદનું આધુનિક સંતુલન:** ચાણક્ય નીતિ મુજબ, સૌ પ્રથમ સમજાવટ અને સહયોગ (સામ), ત્યારબાદ વાજબી પ્રોત્સાહન (દામ), વિરોધીઓની નબળાઈનું વિશ્લેષણ (ભેદ), અને છેલ્લે કાયદાકીય કે બજારી દબાણ (દંડ) નો તાર્કિક ઉપયોગ કરો.
+
+---
+
+### ૩. તબક્કાવાર કાર્યકારી માસ્ટરપ્લાન (3-Phase Unified Masterplan)
+
+૧. **તબક્કો ૧: કિલ્લેબંધી અને તાત્કાલિક સુરક્ષા (૦ થી ૭૨ કલાક):**
+   - તમારા સૌથી નબળા બિંદુ (Single Point of Failure) ને શોધીને ત્યાં સુરક્ષા કવચ સ્થાપિત કરો.
+   - બાહ્ય ઘોંઘાટ અને બિનજરૂરી ચર્ચાઓ બંધ કરીને સંપૂર્ણ ગોપનીયતા લાગુ કરો.
+
+૨. **તબક્કો ૨: ઝડપી પ્રયોગ અને બજાર ચકાસણી (આગામી ૩૦ દિવસ):**
+   - ન્યૂનતમ ખર્ચે ઝડપી ફીડબેક લૂપ સ્થાપિત કરીને ગ્રાહક અથવા હિતધારકોની પ્રતિક્રિયા મેળવો.
+   - તમારી મુખ્ય સક્ષમતા (Circle of Competence) ની અંદર જ રહીને આક્રમક ગતિથી પરિણામ લાવો.
+
+૩. **તબક્કો ૩: અપ્રતિમ સ્પર્ધાત્મક મોટ (દીર્ઘકાલીન સંસ્થાકીયકરણ):**
+   - ગ્રાહકનો અતૂટ વિશ્વાસ, વિતરણ શક્તિ અને બ્રાન્ડ સાર્વભૌમત્વનું એવું નેટવર્ક બનાવો જેને કોઈ પણ વૈશ્વિક હરીફ તોડી ન શકે.
+
+---
+
+### ૪. અપ્રતિમ લીવરેજ અને જોખમ કવચ (Asymmetric Risk Shield)
+• **કાળી હંસ ઘટનાઓ (Black Swan Events):** ધાર્યા કરતાં ૫૦% વધુ ખરાબ સ્થિતિ આવે તો પણ તમારું અસ્તિત્વ ટકી રહે તેવું અનામત ભંડોળ રાખો.
+• **નૈતિક આધારસ્તંભ:** સસ્તી જીત માટે ક્યારેય લાંબા ગાળાની પ્રતિષ્ઠાનું બલિદાન ન આપો. સત્ય અને પ્રમાણિકતા એ સૌથી મોટી મોનોપોલી છે.
+
+---
+
+### ૫. આગામી ૭૨ કલાકના આદેશાત્મક નિર્દેશો (Immediate Execution Directives)
+૧. ${topicLabel} સંબંધિત તાત્કાલિક સંરક્ષણાત્મક ઓર્ડર પાસ કરો.  
+૨. સંસાધનો અને બજેટનું પુનર્વિભાજન કરીને બિનજરૂરી ખર્ચ ૧૦૦% સ્થગિત કરો.  
+૩. સમગ્ર આત્મવિશ્વાસ સાથે સંકલિત યોજનાના પ્રથમ તબક્કાનું બ્યૂગલ ફૂંકો.`;
+
       return {
-        content: `### ૨૧૬ સર્વોચ્ચ મહા-સભા વ્યૂહાત્મક નિર્દેશ
-
-૧. **મૂળભૂત વિશ્લેષણ અને આંતરિક મનોબળ**
-કોઈપણ જટિલ પરિસ્થિતિમાં સૌથી પહેલા પરિણામના ભય અને માનસિક અસ્થિરતામાંથી મુક્ત થવું જરૂરી છે. બાહ્ય પડકારો સામે લડતા પહેલા આંતરિક માળખાની મજબૂતી અને આર્થિક સુરક્ષા સુનિશ્ચિત કરો. જ્યારે સંસાધનો મર્યાદિત હોય ત્યારે ગતિ, સ્પષ્ટતા અને યોગ્ય સમયની પસંદગી એ તમારી સૌથી મોટી તાકાત છે.
-
-૨. **આધુનિક હાઇપર-એક્ઝિક્યુશન અને સ્કેલ સિદ્ધાંત**
-સમસ્યાને તેના મૂળભૂત તથ્યો (First Principles) માં વિભાજિત કરો. જ્યાં સુધી તમારી યુનિટ ઇકોનોમિક્સ નફાકારક ન હોય ત્યાં સુધી અંધાધૂંધ સ્કેલિંગ કરવું વિનાશક સાબિત થાય છે. તમારા મુખ્ય કૌશલ્યના ક્ષેત્ર (Circle of Competence) ની અંદર રહીને ગ્રાહક-કેન્દ્રિત મૂલ્યનું નિર્માણ કરો.
-
-૩. **સંકલિત કાર્યકારી રોડમેપ**
-• **તબક્કો ૧ (૦ થી ૭૨ કલાક):** સૌથી મોટી નબળાઈને ઓળખીને અણધાર્યા જોખમો સામે રક્ષણાત્મક કવચ બનાવો.
-• **તબક્કો ૨ (૩૦ દિવસ):** ઝડપી ફીડબેક લૂપ સાથે ઉત્પાદન અથવા સેવાને બજારમાં ચકાસો.
-• **તબક્કો ૩ (દીર્ઘકાલીન મોટ):** વિશ્વસનીયતા અને સ્કેલનું એવું સંયોજન બનાવો જેને કોઈ પણ હરીફ સરળતાથી તોડી ન શકે.`,
+        content,
         followUpQuestions: [
-          'આ રોડમેપના તબક્કા ૧ માટે કયા ચોક્કસ માપદંડો નિર્ધારિત કરવા?',
-          'ઓછા બજેટમાં ઝડપી ગ્રાહક જોડાણ કેવી રીતે મેળવવું?',
-          'આ યાત્રામાં નૈતિક મૂલ્યો સાથે નફાકારકતા કેવી રીતે જાળવવી?'
+          hasDilemma ? `${topicLabel} ના તબક્કા ૧ ના અમલીકરણ માટે સૌથી પહેલું કયું માપદંડ નક્કી કરવું?` : 'આ સંકલિત યોજનાના પ્રથમ તબક્કા માટે કયા માપદંડો નક્કી કરવા?',
+          'ઓછામાં ઓછા ખર્ચે ઝડપી અને અપ્રતિમ વિજય મેળવવા કયા લીવરનો ઉપયોગ કરવો?',
+          'આ યાત્રામાં નૈતિક મૂલ્યો અને ગરિમા જાળવીને સૌથી મોટી સંપત્તિનું નિર્માણ કેવી રીતે કરવું?'
         ]
       };
     }
 
     if (language === 'hi') {
+      const topicLabel = hasDilemma ? `"${dilemmaSnippet}"` : 'इस महत्वपूर्ण चुनौती';
+      const content = `### २૧૬ सर्वोच्च महा-सभा एकीकृत रणनीतिक आदेश (Unified Strategic Decree)
+**सिंडिकेट मंथन:** १०८ भारत विश्वगुरु मनीषियों (चाणक्य, श्रीकृष्ण, छत्रपति शिवाजी, स्वामी विवेकानंद) एवं १०८ आधुनिक वैश्विक दिग्गजों (एलन मस्क, वॉरेन बफेट, रतन टाटा) का संयुक्त बौद्धिक निष्कर्ष।
+
+---
+
+### १. सर्वोच्च दृष्टिकोण एवं दार्शनिक आधार (Executive Perspective)
+हम **२१६ सर्वोच्च महा-सभा** हैं। ${topicLabel} के संदर्भ में संपूर्ण सभा ने गहन विचार-विमर्श के उपरांत सर्वसम्मति से यह आदेश पारित किया है।
+
+जब भी कोई दूरदर्शी नेता कठिन परिस्थिति में घिरता है, तो सबसे बड़ा शत्रु संशय और परिणाम का भय होता है। गीता के **निष्काम कर्मयोग** और आधुनिक **जोखिम प्रबंधन** का एकीकृत सत्य है: *परिणामों की आसक्ति त्यागकर अपनी रणनीति की शुचिता और कर्मठता पर ध्यान केंद्रित करना ही विजय की अंतिम गारंटी है।*
+
+---
+
+### २. प्रथम सिद्धांत एवं इकाई अर्थशास्त्र (First Principles Root)
+• **मूल भौतिक सत्य का विश्लेषण:** समस्या को उसकी बुनियादी भौतिक सीमाओं में तोड़ें। दूसरों की नकल करने के बजाय स्वयं के मूल सिद्धांतों पर विचार करें।
+• **सख्त वित्तीय अनुशासन:** जब तक आपकी इकाई अर्थशास्त्र (Unit Economics) लाभदायक न हो, तब तक विस्तार करना आत्मघाती है।
+• **साम-दाम-दंड-भेद का आधुनिक संतुलन:** सर्वप्रथम निष्पक्ष संवाद (साम), न्यायसंगत प्रोत्साहन (दाम), आंतरिक कमजोरियों का विश्लेषण (भेद), और अंत में विधिक अथवा प्रतिस्पर्धी दबाव (दंड) का प्रयोग करें।
+
+---
+
+### ३. चरणबद्ध रणनीतिक कार्ययोजना (3-Phase Masterplan)
+
+१. **चरण १: सुदृढ़ सुरक्षा चक्र (० से ७२ घंटे):**
+   - सबसे कमजोर कड़ी (Single Point of Failure) को पहचानकर तुरंत सुरक्षात्मक आवरण बनाएं।
+   - रणनीतिक गोपनीयता लागू करें और व्यर्थ की बयानबाजी से बचें।
+
+२. **चरण २: तीव्र निष्पादन एवं परीक्षण (आगामी ३० दिन):**
+   - न्यूनतम लागत में त्वरित फीडबैक लूप के साथ बाजार में अपनी उपयोगिता सिद्ध करें।
+   - अपनी मुख्य क्षमता (Circle of Competence) पर ध्यान केंद्रित कर आगे बढ़ें।
+
+३. **चरण ३: अभेद्य प्रतिस्पर्धी दुर्ग (दीर्घकालिक):**
+   - विश्वास, तकनीकी नवाचार और वितरण का ऐसा तंत्र बनाएं जिसे कोई प्रतिद्वंद्वी भेद न सके।
+
+---
+
+### ४. अनदेखे जोखिम एवं रक्षात्मक कवच (Asymmetric Risk Shield)
+• **अप्रत्याशित संकट (Black Swan Events):** सबसे प्रतिकूल परिस्थिति से निपटने हेतु पर्याप्त वित्तीय व सामरिक बफर रखें।
+• **चरित्र एवं सत्यनिष्ठा:** क्षणिक लाभ के लिए अपनी प्रतिष्ठा और आदर्शों से समझौता कभी न करें।
+
+---
+
+### ५. अगले ७२ घंटों के लिए अनिवार्यताएं (Immediate Directives)
+૧. ${topicLabel} से संबंधित शीर्ष प्राथमिकताओं को तुरंत अंतिम रूप दें।  
+२. अनावश्यक व्ययों पर पूर्ण विराम लगाएं।  
+૩. निर्भय होकर प्रथम चरण का शंखनाद करें.`;
+
       return {
-        content: `### २१६ सर्वोच्च महा-सभा रणनीतिक निर्देश
-
-१. **आधारभूत विश्लेषण एवं आंतरिक संप्रभुता**
-किसी भी जटिल चुनौती में सबसे पहले संशय से मुक्त होकर कर्तव्य-परायण होना अनिवार्य है। आक्रामक रणनीति से पूर्व आंतरिक सुरक्षा और वित्तीय सुदृढ़ता का निर्माण करें। सीमित संसाधनों में चपलता, सही समय का चयन और असममित शक्ति ही निर्णायक विजय दिलाती है।
-
-२. **आधुनिक हाइपर-एक्ज़ीक्यूशन एवं पैमाना**
-समस्या को उसके मूलभूत भौतिक तथ्यों (First Principles) तक विघटित करें। जब तक आपकी इकाई अर्थशास्त्र (Unit Economics) मजबूत न हो, तब तक विस्तार घातक सिद्ध होता है। अपनी मुख्य क्षमता (Circle of Competence) पर ध्यान केंद्रित कर अभेद्य प्रतिस्पर्धी दुर्ग बनाएं।
-
-३. **एकीकृत क्रियान्वयन रोडमैप**
-• **चरण १ (० से ७२ घंटे):** सबसे कमजोर कड़ी को पहचानकर तुरंत सुरक्षात्मक कवच तैयार करें।
-• **चरण २ (३० दिन):** त्वरित फीडबैक लूप के साथ बाजार में अपनी उपयोगिता सिद्ध करें।
-• **चरण ३ (दीर्घकालिक):** ऐसा प्रतिस्पर्धी सुरक्षा कवच बनाएं जिसे कोई भी प्रतिद्वंद्वी न भेद सके।`,
+        content,
         followUpQuestions: [
-          'चरण १ के सुरक्षा उपायों को बिना किसी देरी के कैसे लागू करें?',
-          'प्रतियोगियों के दबाव में अपनी नैतिक प्रतिष्ठा की रक्षा कैसे करें?',
-          'इस रणनीति में न्यूनतम लागत के साथ अधिकतम प्रभाव कैसे प्राप्त करें?'
+          hasDilemma ? `${topicLabel} के चरण १ के सफल क्रियान्वयन हेतु क्या सुरक्षा उपाय करें?` : 'चरण १ के सुरक्षा उपायों को बिना किसी विलंब के कैसे लागू करें?',
+          'सीमित पूंजी में सबसे प्रभावी और स्थायी परिणाम कैसे प्राप्त किए जाएं?',
+          'नैतिक शुचिता बनाए रखते हुए आक्रामक विस्तार कैसे सुनिश्चित करें?'
         ]
       };
     }
 
-    if (language === 'sa') {
-      return {
-        content: `### २१६ सर्वोच्च महा-सभा रणनीतिक-आदेशः
+    // Default English Supreme Council Decree
+    const topicLabel = hasDilemma ? `regarding "${dilemmaSnippet}"` : 'addressing your institutional dilemma';
+    const content = `### 216 Supreme Council Unified Strategic Decree
+**The Sovereign Syndicate Synthesis:** The converged civilizational intelligence of 108 Bharat Vishwaguru Legends (Chanakya, Shri Krishna, Chhatrapati Shivaji, Swami Vivekananda) and 108 Modern Global Visionaries (Elon Musk, Warren Buffett, Ratan Tata, Sam Altman).
 
-१. **आधारभूत-विश्लेषणम् आन्तरिक-संप्रभुता च**
-कस्मिन्नपि संकटे सर्वप्रथमं संशयान् मुक्त्वा स्वकर्तव्ये निष्ठा धार्या। आक्रमणात् पूर्वं स्वदुर्गाणां रक्षणं कुरुत।
+---
 
-२. **आधुनिक-कार्यपद्धतिः स्वनिपुणता च**
-मूलतत्त्वान् विविच्या निर्णयं स्वीकुरुत। यावत् अर्थनीतिः सुदृढा न भवति तावत् विस्तारः हानिकरः भवति।
+### 1. Unified Sovereign Decree & Civilizational Root
+We are the **216 Supreme Council**. Having convened in unified assembly ${topicLabel}, the Council issues this authoritative strategic decree with singular resolve.
 
-३. **एकीकृत-कार्ययोजना**
-• **प्रथम-चरणम् (० तः ७२ होराः):** दौर्बल्यं ज्ञात्वा रक्षणकवचं रचयतु।
-• **द्वितीय-चरणम् (३० दिनानि):** प्रत्यक्षपरीक्षां कृत्वा परिणामं पश्यतु।
-• **तृतीय-चरणम् (दीर्घकालिकम्):** अभेद्यं दुर्गं प्रतिष्ठापयतु।`,
-        followUpQuestions: [
-          'प्रथमचरणे कानि प्रधानानि कार्याणि भवेयुः?',
-          'अल्पाल्पसंसाधनैः कथं महान् विजयः साध्यते?',
-          'धर्मसहितानां लाभानां कथं संवर्धनं कार्यम्?'
-        ]
-      };
-    }
+When leaders face high-complexity friction, their primary point of vulnerability is almost never lack of effort—it is **cognitive fragmentation and outcome anxiety**. Uniting the timeless Gita doctrine of *Nishkama Karma* (relentless, detached execution) with modern institutional risk architecture reveals an immutable law: **True competitive sovereignty is achieved by eliminating emotional reactivity and concentrating unyielding force on fundamental leverage points.**
 
-    if (language === 'es') {
-      return {
-        content: `### Decreto Estratégico Unificado del Consejo Supremo 216
+---
 
-I. **Fundamento y Compostura Soberana**
-En toda encrucijada estratégica, el primer objetivo es erradicar la incertidumbre reactiva y blindar los recursos esenciales. Antes de cualquier expansión, selle las fugas operativas. La velocidad y la información privilegiada son los mayores ecualizadores.
+### 2. First Principles & Unit Economics Root Analysis
+• **Physical Truth vs. Consensus Myth:** Deconstruct the dilemma to its unalterable physical and economic limits. Reject conventional industry dogmas and build your solution strictly from verified first principles.
+• **Unit Economics & Balance Sheet Fortification:** Scaling without positive unit economics and structural margin of safety is self-inflicted vulnerability. Ensure your core engine generates durable cash flows before expanding surface area.
+• **Strategic Statecraft (Sama-Dama-Danda-Bheda):** Systematically orchestrate diplomacy (Sama), aligned incentives (Dama), competitive differentiation and information asymmetry (Bheda), and decisive market leverage (Danda).
 
-II. **Velocidad de Ejecución y Moat Económico**
-Descomponga el problema en sus principios fundamentales (First Principles). Escalar sin economía unitaria sólida es destructivo. Concéntrese estrictamente en su círculo de competencia.
+---
 
-III. **Hoja de Ruta en 3 Fases**
-• **Fase 1 (0 a 72 Horas):** Identifique y resuelva su mayor vulnerabilidad estructural; aplique máxima discreción.
-• **Fase 2 (30 Días):** Acorte los ciclos de retroalimentación para validar tracción sin sobrecostes fijos.
-• **Fase 3 (Largo Plazo):** Institucionalice ventajas de distribución y confianza que se compongan orgánicamente.`,
-        followUpQuestions: [
-          '¿Qué métricas clave deben regir la ejecución de la Fase 1?',
-          '¿Cómo acelerar la validación de mercado con el menor coste posible?',
-          '¿Qué salvaguardas aseguran la ética mientras se escala con agresividad?'
-        ]
-      };
-    }
+### 3. The Unified 3-Phase Execution Roadmap
 
-    if (language === 'de') {
-      return {
-        content: `### Strategischer Erlass des 216 Höchsten Rates
+1. **Phase 1: Defensive Lockdown & Vulnerability Elimination (0–72 Hours):**
+   - Identify and plug your single biggest structural vulnerability (Single Point of Failure).
+   - Enforce rigorous operational secrecy and eliminate non-essential public exposure.
 
-I. **Fundamentale Analyse und Souveränität**
-In jeder strategischen Herausforderung gilt es zuerst, emotionale Reaktivität zu eliminieren und Kernressourcen abzusichern. Vor jeder Expansion müssen betriebliche Schwachstellen geschlossen werden. Geschwindigkeit und Präzision sind die entscheidenden Hebel.
+2. **Phase 2: High-Velocity Tactical Prototyping (Next 30 Days):**
+   - Compress iteration feedback loops to validate market traction without taking on fixed-cost bloat.
+   - Anchor operations strictly inside your verified Circle of Competence.
 
-II. **Exekutionsgeschwindigkeit & Burggraben**
-Zerlegen Sie die Herausforderung in ihre Grundprinzipien (First Principles). Wachstum ohne tragfähige Deckungsbeiträge führt zur Instabilität. Bleiben Sie konsequent in Ihrem Kompetenzbereich.
+3. **Phase 3: Institutionalizing the Compounding Moat (Permanent Horizon):**
+   - Construct proprietary distribution channels, technological network effects, and unassailable brand trust that compound automatically with zero marginal cost.
 
-III. **Der 3-Phasen-Aktionsplan**
-• **Phase 1 (0 bis 72 Stunden):** Größte Verwundbarkeit identifizieren und Schutzschild etablieren.
-• **Phase 2 (30 Tage):** Schnelle Feedback-Schleifen etablieren und Marktresonanz ohne Fixkostenrisiko sichern.
-• **Phase 3 (Langfristig):** Einen unanfechtbaren Burggraben durch Vertrauen und Reichweite schaffen.`,
-        followUpQuestions: [
-          'Welche Metriken sichern die erfolgreiche Umsetzung von Phase 1?',
-          'Wie validiert man Marktpotenzial bei minimalem Mitteleinsatz?',
-          'Welche Vorkehrungen schützen den Ruf bei schnellem Wachstum?'
-        ]
-      };
-    }
+---
+
+### 4. Asymmetric Levers & Downside Protection
+• **Black Swan Immunity:** Maintain operational and capital reserves sufficient to survive market downturns twice as severe as your most pessimistic forecast.
+• **Reputational Integrity as a Monopoly:** Never compromise moral authority or fiduciary trust for ephemeral short-term wins. Relentless trustworthiness is the ultimate asymmetric moat.
+
+---
+
+### 5. Immediate 72-Hour Directives
+1. Issue an immediate operational lockdown on all non-essential initiatives related to ${topicLabel}.
+2. Reallocate capital and attention to the #1 high-leverage priority.
+3. Advance with quiet confidence, precision execution, and sovereign resolve.`;
 
     return {
-      content: `### 216 Supreme Council Unified Strategic Decree
-
-I. **Foundational Root & Composure**
-In any strategic confrontation, the primary objective is eliminating outcome anxiety while fortifying the core balance sheet. Before expanding outward, seal operational leakages and eliminate single points of failure. Speed and information superiority become the decisive equalizers.
-
-II. **Hyper-Execution Velocity & Economic Moat**
-Deconstruct the dilemma into its fundamental physical constraints (First Principles). Rapid scaling without positive unit economics leads directly to systemic fragility. Anchor every initiative strictly inside your Circle of Competence.
-
-III. **The Unified 3-Phase Roadmap**
-• **Phase 1 (0 to 72 Hours):** Identify and plug your single biggest structural vulnerability; enforce operational secrecy.
-• **Phase 2 (30 Days):** Compress feedback loops to validate market traction without fixed overhead bloat.
-• **Phase 3 (Compounding Horizon):** Institutionalize distribution advantages and brand trust that compound automatically.`,
+      content,
       followUpQuestions: [
-        'What specific metrics should govern Phase 1 implementation?',
-        'How do I accelerate customer acquisition with minimal spend?',
-        'What safeguard ensures ethical integrity while scaling aggressively?'
+        hasDilemma ? `What specific performance metric should govern the execution of Phase 1 ${topicLabel}?` : 'What specific performance metrics should govern Phase 1 implementation?',
+        'How can I accelerate strategic execution with minimal upfront capital expenditure?',
+        'What safeguard ensures uncompromising ethical integrity while scaling aggressively?'
+      ]
+    };
+  },
+
+  /**
+   * Top-Tier Simulated Multi-Agent Debate Generator (ChatGPT Pro Standard)
+   */
+  _generateRichSimulatedDebateResponse(agentA, agentB, dilemma = '', language = 'gu') {
+    const cleanDilemma = (dilemma || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 60);
+    const hasDilemma = cleanDilemma.length > 0;
+    const nameA = agentA?.name || 'Chanakya';
+    const nameB = agentB?.name || 'Machiavelli';
+
+    if (language === 'gu') {
+      const topicLabel = hasDilemma ? `"${cleanDilemma}"` : 'આ વ્યૂહાત્મક સંકટ';
+      const content = `## ⚔️ સિન્ડિકેટ દ્વંદ્વ: ${nameA} વિરુદ્ધ ${nameB}
+**ચર્ચાનો વિષય:** ${topicLabel}
+
+---
+
+### ૧. ${nameA} નો પ્રારંભિક હુમલો અને મૂળભૂત પરિપ્રેક્ષ્ય
+હું **${nameA}** છું. આ પરિસ્થિતિમાં કોઈ પણ ભાવનાત્મક કે ઉતાવળિયો નિર્ણય આત્મઘાતી સાબિત થશે. જ્યાં સુધી તમે તમારા મૂળભૂત મૂલ્યો, સંસાધન સુરક્ષા અને માહિતીની ગુપ્તતાને સુનિશ્ચિત નહીં કરો ત્યાં સુધી આગળ વધવું મૂર્ખામી છે. સામ-દામ-દંડ-ભેદનો વિવેકપૂર્વક ઉપયોગ કરો; સીધા ટકરાવા કરતાં વિરોધીની આંતરિક નબળાઈઓને ખુલ્લી પાડીને વિજય હાંસલ કરવો એ જ સાચી નીતિ છે.
+
+---
+
+### ૨. ${nameB} નો વળતો પ્રહાર અને વિરોધાભાસી દ્રષ્ટિકોણ
+હું **${nameB}** છું. ${nameA} ના સિદ્ધાંતો આદર્શવાદી હોઈ શકે છે, પરંતુ વાસ્તવિકતામાં ગતિ (Speed) અને શક્તિનું નિર્દય પ્રદર્શન જ પરિણામ લાવે છે. સમય બગાડ્યા વિના સૌથી પહેલા તમારા વિરોધીઓના સંસાધનો અને બજાર પર પોતાનો કબજો જમાવો. વિજયી બન્યા પછી જ ઈતિહાસ લખાય છે; પરિણામો નિર્વિવાદ હોવા જોઈએ.
+
+---
+
+### ૩. સામસામે ક્રોસ-એક્ઝામિનેશન અને નબળાઈઓની ચકાસણી
+• **${nameA} ની ચેતવણી:** "કેવળ બળપ્રયોગથી જીતેલું રાજ્ય લાંબુ ટકતું નથી. નૈતિક આધાર વગરનો વિજય વિનાશ તરફ દોરી જાય છે."
+• **${nameB} નો જવાબ:** "નૈતિકતા ત્યારે જ રક્ષણ આપી શકે જ્યારે તમારી પાસે સત્તા અને સંસાધનો હોય. નબળો શાસક ગમે તેટલો સદાચારી હોય, પરાસ્ત જ થાય છે."
+
+---
+
+### ૪. સભાનું સંકલિત તારણ અને સર્વોચ્ચ વ્યૂહ (Winning Synthesis)
+બંને પરિપ્રેક્ષ્યોનું મંથન કરતાં સ્પષ્ટ વિજેતા માર્ગ નીચે મુજબ છે:
+૧. **આંતરિક પાયો:** ${nameA} ના સિદ્ધાંત મુજબ ૧૦૦% ગોપનીયતા, રોકડ પ્રવાહની સુરક્ષા અને ગઠબંધન સ્થાપો.
+૨. **બાહ્ય અમલીકરણ:** ${nameB} ના નિયમ મુજબ નિર્ણય લીધા પછી કોઈ ખચકાટ વિના આક્રમક ગતિ અને અતૂટ સંકલ્પથી લક્ષ્ય પર ત્રાટકો.
+
+---
+
+### ૫. આગામી ૪૮ કલાકના નક્કર નિર્દેશો
+૧. ${topicLabel} સંબંધિત સૌથી મહત્વપૂર્ણ પગલાંની ગોપનીય યાદી બનાવો.
+૨. કોઈપણ અસમંજસ વગર પ્રથમ તબક્કાનો અમલ શરૂ કરો.`;
+
+      return {
+        content,
+        followUpQuestions: [
+          `આ સંઘર્ષમાં ${nameA} અને ${nameB} ના દ્રષ્ટિકોણ વચ્ચે સંતુલન કેવી રીતે સાધવું?`,
+          'ન્યૂનતમ જોખમ સાથે વિરોધીઓ સામે નિર્ણાયક સરસાઈ કેવી રીતે મેળવવી?',
+          'લાંબા ગાળે આ વ્યૂહરચનાને સ્થિર મોટમાં કેવી રીતે ફેરવવી?'
+        ]
+      };
+    }
+
+    // Default English Debate
+    const topicLabel = hasDilemma ? `regarding "${cleanDilemma}"` : 'addressing this strategic crossroads';
+    const content = `## ⚔️ Syndicate Doctrine Clash: ${nameA} vs ${nameB}
+**Subject of Deliberation:** ${topicLabel}
+
+---
+
+### 1. ${nameA}'s Opening Offensive & First Principles Stance
+I am **${nameA}**. In addressing high-stakes crossroads ${topicLabel}, the foundational error is emotional reactivity and premature disclosure. True strategic sovereignty requires forensic resource auditing, unyielding self-mastery, and asymmetric patience. Orchestrate your leverage points systematically (Sama-Dama-Danda-Bheda) before adversaries even perceive your maneuver.
+
+---
+
+### 2. ${nameB}'s Counter-Thrust & Realistic Critique
+I am **${nameB}**. While ${nameA} counsels patient statecraft, market physics favors unrelenting execution velocity. Deliberation without aggressive market capture breeds vulnerability. Strip away moral hesitation; establish commanding leverage, secure strategic territory, and confront ground realities as they exist, not as idealists wish them to be.
+
+---
+
+### 3. Cross-Examination & Direct Rebuttal
+• **${nameA}'s Rebuttal:** "Raw velocity without balance sheet fortification leads to structural implosion. If your core unit economics and ethical alignment are compromised, the empire collapses from within."
+• **${nameB}'s Counter:** "Patience without execution is paralysis. Competitors will not wait for your ideal conditions. Seize the high ground today."
+
+---
+
+### 4. The Council's Unified Strategic Synthesis
+The dominant move emerges from the synthesis of both titans:
+1. **Architectural Shield:** Adopt ${nameA}'s discipline: secure your downside risk, enforce confidentiality, and protect liquidity reserves.
+2. **Tactical Spear:** Adopt ${nameB}'s velocity: once the foundation is fortified, strike with compressed feedback loops and decisive force.
+
+---
+
+### 5. Immediate 48-Hour Actionable Directive
+1. Isolate the single highest-leverage decision point for ${topicLabel}.
+2. Eliminate operational hesitation and advance with sovereign conviction.`;
+
+    return {
+      content,
+      followUpQuestions: [
+        `How do I balance ${nameA}'s defensive patience with ${nameB}'s aggressive speed?`,
+        'What is the greatest downside risk if I execute this move within 48 hours?',
+        'How can this strategic victory be converted into an unassailable long-term moat?'
       ]
     };
   }

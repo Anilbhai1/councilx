@@ -21,7 +21,15 @@
       "package": "com.councilx.syndicate"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "CouncilX - AI Syndicate & Strategic Advisory",
+      "shortName": "CouncilX",
+      "lang": "en-US",
+      "display": "standalone",
+      "orientation": "portrait",
+      "backgroundColor": "#050505",
+      "themeColor": "#00F0FF",
+      "description": "CouncilX: 216 Domain Super-Intelligence Advisory Matrix for Founders & Operators."
     }
   }
 }

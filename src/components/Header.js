@@ -4,11 +4,13 @@
  * Corporate Black & White Luxury Theme (OpenAI / Bloomberg Standard)
  */
 
-import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/i18n';
 import LanguageModal from './LanguageModal';
+import InstallAppModal from './InstallAppModal';
+import { pwaService } from '../services/pwaService';
 
 export default function Header({
   isPremium = false,
@@ -24,6 +26,32 @@ export default function Header({
 }) {
   const { lang, languages, t } = useLanguage();
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    setCanInstall(pwaService.canPromptDirectly());
+    setIsInstalled(pwaService.isInstalled());
+
+    const unsubscribe = pwaService.subscribe((state) => {
+      setCanInstall(state.canInstall);
+      setIsInstalled(state.isInstalled);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const handleInstallAppClick = async () => {
+    if (pwaService.canPromptDirectly()) {
+      const res = await pwaService.promptInstall();
+      if (!res.success && (res.isIOS || res.reason === 'no-prompt')) {
+        setShowInstallModal(true);
+      }
+    } else {
+      setShowInstallModal(true);
+    }
+  };
 
   const currentLangObj = languages.find(l => l.code === lang) || languages[0];
 
@@ -48,6 +76,19 @@ export default function Header({
 
         {/* Right Action Icons */}
         <View style={styles.actionRow}>
+          {/* Highly visible 'Install App' (Download) Button */}
+          {!isInstalled && (
+            <TouchableOpacity
+              style={styles.installAppBtn}
+              onPress={handleInstallAppClick}
+              activeOpacity={0.8}
+              accessibilityLabel="Install CouncilX App on Mobile / Desktop"
+            >
+              <Ionicons name="arrow-down-circle" size={13} color="#000000" />
+              <Text style={styles.installAppBtnText}>Install App</Text>
+            </TouchableOpacity>
+          )}
+
           {/* Language Selector Pill */}
           <TouchableOpacity
             style={styles.langPill}
@@ -131,6 +172,15 @@ export default function Header({
         visible={showLangMenu}
         onClose={() => setShowLangMenu(false)}
       />
+
+      {/* PWA Install Modal */}
+      <InstallAppModal
+        visible={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        onDirectInstall={handleInstallAppClick}
+        canPromptDirectly={canInstall}
+        isIOS={pwaService.isIOS()}
+      />
     </View>
   );
 }
@@ -181,6 +231,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  installAppBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#00F0FF',
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 14,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.45,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  installAppBtnText: {
+    color: '#000000',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
   },
   langPill: {
     flexDirection: 'row',

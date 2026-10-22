@@ -92,6 +92,25 @@ const server = http.createServer((req, res) => {
         razorpayKeyIdConfigured: Boolean(process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID),
         razorpaySecretConfigured: Boolean(process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== 'your_razorpay_key_secret_here')
       });
+    } else if (url === '/manifest.json') {
+      const manifestPath = path.resolve(__dirname, '..', 'public', 'manifest.json');
+      if (fs.existsSync(manifestPath)) {
+        res.setHeader('Content-Type', 'application/manifest+json');
+        res.writeHead(200);
+        res.end(fs.readFileSync(manifestPath));
+      } else {
+        res.status(404).json({ error: 'manifest.json not found' });
+      }
+    } else if (url === '/sw.js') {
+      const swPath = path.resolve(__dirname, '..', 'public', 'sw.js');
+      if (fs.existsSync(swPath)) {
+        res.setHeader('Content-Type', 'application/javascript');
+        res.setHeader('Service-Worker-Allowed', '/');
+        res.writeHead(200);
+        res.end(fs.readFileSync(swPath));
+      } else {
+        res.status(404).json({ error: 'sw.js not found' });
+      }
     } else {
       res.status(404).json({ error: 'Endpoint not found' });
     }

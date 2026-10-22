@@ -46,18 +46,27 @@ export function createStandardUserSession(overrides = {}) {
 }
 
 /**
- * Store the bulletproof local user session in AsyncStorage ('COUNCILX_USER_SESSION')
- * and synchronize legacy app keys for seamless backwards-compatibility.
+ * Helper to read a cookie value by name on web
+ */
+function getCookie(name) {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^|;\\s*)(' + name + ')=([^;]*)'));
+  return match ? decodeURIComponent(match[3]) : null;
+}
+
+/**
+ * Store the bulletproof local user session in localStorage, cookies, and AsyncStorage
+ * Guarantees user stays logged in indefinitely across days, weeks, and browser restarts
  */
 export async function saveLocalSession(sessionInput = {}) {
   const session = createStandardUserSession(sessionInput);
   try {
     const sessionString = JSON.stringify(session);
     
-    // Store in primary key
+    // 1. Store in AsyncStorage
     await AsyncStorage.setItem(COUNCILX_USER_SESSION_KEY, sessionString);
 
-    // Synchronize legacy keys used across existing components
+    // 2. Synchronize legacy keys used across existing components
     await Promise.all([
       AsyncStorage.setItem('@councilx_is_logged_in', 'true'),
       AsyncStorage.setItem('@councilx_user_id', session.user_id),
@@ -68,6 +77,31 @@ export async function saveLocalSession(sessionInput = {}) {
       AsyncStorage.setItem('@councilx_free_chats_used', '0')
     ]);
 
+    // 3. Web Persistent Storage: localStorage (Survives indefinitely)
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem(COUNCILX_USER_SESSION_KEY, sessionString);
+        window.localStorage.setItem('@councilx_is_logged_in', 'true');
+        window.localStorage.setItem('@councilx_user_id', session.user_id);
+        window.localStorage.setItem('@councilx_user_email', session.email);
+        window.localStorage.setItem('@councilx_user_name', session.name);
+        window.localStorage.setItem('@councilx_user_profile', sessionString);
+      } catch (lsErr) {
+        console.warn('localStorage saveLocalSession warning:', lsErr);
+      }
+    }
+
+    // 4. Web Persistent Storage: Cookies (Survives browser restarts, 10-year expiry)
+    if (typeof document !== 'undefined') {
+      try {
+        const tenYears = 315360000;
+        document.cookie = `councilx_session=${encodeURIComponent(sessionString)}; max-age=${tenYears}; path=/; SameSite=Lax`;
+        document.cookie = `councilx_logged_in=true; max-age=${tenYears}; path=/; SameSite=Lax`;
+      } catch (cookieErr) {
+        console.warn('cookie saveLocalSession warning:', cookieErr);
+      }
+    }
+
     return session;
   } catch (err) {
     console.warn('⚠️ AsyncStorage saveLocalSession notice:', err?.message || err);
@@ -76,16 +110,44 @@ export async function saveLocalSession(sessionInput = {}) {
 }
 
 /**
- * Retrieve active local session. Falls back to legacy keys if needed.
+ * Retrieve active local session.
+ * Checks localStorage first (synchronous & instant), then AsyncStorage, then persistent cookies.
  */
 export async function getLocalSession() {
   try {
+    // 1. Check window.localStorage first on web
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const lsRaw = window.localStorage.getItem(COUNCILX_USER_SESSION_KEY);
+        if (lsRaw) {
+          return JSON.parse(lsRaw);
+        }
+        const lsLegacy = window.localStorage.getItem('@councilx_is_logged_in');
+        if (lsLegacy === 'true') {
+          const lsProfile = window.localStorage.getItem('@councilx_user_profile');
+          if (lsProfile) return JSON.parse(lsProfile);
+        }
+      } catch (lsErr) {}
+    }
+
+    // 2. Check AsyncStorage
     const raw = await AsyncStorage.getItem(COUNCILX_USER_SESSION_KEY);
     if (raw) {
       return JSON.parse(raw);
     }
 
-    // Check legacy login key
+    // 3. Check persistent cookie
+    const cookieSession = getCookie('councilx_session');
+    if (cookieSession) {
+      try {
+        const parsed = JSON.parse(cookieSession);
+        // Resync into localStorage & AsyncStorage
+        await saveLocalSession(parsed);
+        return parsed;
+      } catch (ce) {}
+    }
+
+    // 4. Check legacy login key
     const legacyLoggedIn = await AsyncStorage.getItem('@councilx_is_logged_in');
     if (legacyLoggedIn === 'true') {
       const legacyProfile = await AsyncStorage.getItem('@councilx_user_profile');
@@ -109,20 +171,41 @@ export async function getLocalSession() {
 }
 
 /**
- * Cleanly clear both standard and legacy user session items
+ * Cleanly clear session across AsyncStorage, localStorage, and persistent cookies
+ * ONLY called when user explicitly triggers 'Logout'
  */
 export async function clearLocalSession() {
   try {
-    await AsyncStorage.multiRemove([
+    const keysToRemove = [
       COUNCILX_USER_SESSION_KEY,
       '@councilx_is_logged_in',
       '@councilx_user_id',
       '@councilx_user_email',
       '@councilx_user_name',
       '@councilx_user_profile',
-      '@councilx_free_chats_used'
-    ]);
+      '@councilx_free_chats_used',
+      '@councilx_extra_agent_slots'
+    ];
 
+    // 1. Clear AsyncStorage
+    await AsyncStorage.multiRemove(keysToRemove);
+
+    // 2. Clear window.localStorage on web
+    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        keysToRemove.forEach(k => window.localStorage.removeItem(k));
+      } catch (e) {}
+    }
+
+    // 3. Clear persistent cookies
+    if (typeof document !== 'undefined') {
+      try {
+        document.cookie = 'councilx_session=; max-age=0; path=/; SameSite=Lax';
+        document.cookie = 'councilx_logged_in=; max-age=0; path=/; SameSite=Lax';
+      } catch (e) {}
+    }
+
+    // 4. Supabase Auth signOut
     if (isSupabaseConfigured() && supabase?.auth) {
       await supabase.auth.signOut().catch(() => {});
     }
