@@ -97,7 +97,7 @@ module.exports = async function handler(req, res) {
     } else {
       // Direct Razorpay payment without server-generated order ID:
       // Verify payment directly against the Razorpay Payments API
-      const liveKeyId = process.env.RAZORPAY_KEY_ID || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC';
+      const liveKeyId = process.env.RAZORPAY_KEY_ID || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID
       const authHeader = 'Basic ' + Buffer.from(`${liveKeyId}:${secret}`).toString('base64');
 
       try {
