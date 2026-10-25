@@ -98,52 +98,50 @@ export default function AuthScreen({ onAuthSuccess }) {
   useEffect(() => {
     let isSubscribed = true;
 
+    const processSession = async (user) => {
+      if (!user || !isSubscribed) return;
+      const userId = user.id;
+      const email = user.email || 'member@councilx.ai';
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || 'Council Member';
+      const avatarUrl = user.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces';
+
+      // Save valid standard user session to localStorage & AsyncStorage ('COUNCILX_USER_SESSION')
+      await saveLocalSession({
+        user_id: userId,
+        email,
+        name,
+        avatar_url: avatarUrl,
+        provider: 'google',
+        free_chats_remaining: 5,
+        extra_agent_slots: 0,
+        isAuthenticated: true
+      });
+
+      // Safe Profile Upsert into Supabase 'profiles' (silent RLS catch)
+      safeUpsertProfile({
+        id: userId,
+        email,
+        full_name: name,
+        avatar_url: avatarUrl,
+        is_premium: false,
+        message_count: 0,
+        bonus_messages: 0,
+        base_free_limit: 5,
+        subscription_tier: 'initiate'
+      }).catch(() => {});
+
+      if (onAuthSuccess && isSubscribed) {
+        onAuthSuccess();
+      }
+    };
+
     const checkIncomingOAuthSession = async () => {
       if (!isSupabaseConfigured() || !supabase?.auth) return;
 
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (session?.user && isSubscribed) {
-          const user = session.user;
-          const userId = user.id;
-          const email = user.email || 'member@councilx.ai';
-          const name = user.user_metadata?.full_name || user.user_metadata?.name || 'Council Member';
-          const avatarUrl = user.user_metadata?.avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces';
-
-          // Safe Profile Upsert into Supabase 'profiles' (silent RLS catch)
-          await safeUpsertProfile({
-            id: userId,
-            email,
-            full_name: name,
-            avatar_url: avatarUrl,
-            is_premium: false,
-            message_count: 0,
-            bonus_messages: 0,
-            base_free_limit: 5,
-            subscription_tier: 'initiate'
-          });
-
-          // Save valid standard user session to AsyncStorage ('COUNCILX_USER_SESSION')
-          await saveLocalSession({
-            user_id: userId,
-            email,
-            name,
-            avatar_url: avatarUrl,
-            provider: 'google',
-            free_chats_remaining: 5,
-            extra_agent_slots: 0,
-            isAuthenticated: true
-          });
-
-          // Guarantee free chats quota counter is ready
-          const status = await paymentService.getUserStatus();
-          if (!status.isPremium && (status.remainingFree === undefined || status.remainingFree === null)) {
-            await AsyncStorage.setItem('@councilx_free_chats_used', '0');
-          }
-
-          if (onAuthSuccess) {
-            onAuthSuccess();
-          }
+          await processSession(session.user);
         }
       } catch (e) {
         console.warn('OAuth session check notice on AuthScreen:', e?.message || e);
@@ -152,8 +150,23 @@ export default function AuthScreen({ onAuthSuccess }) {
 
     checkIncomingOAuthSession();
 
+    let authSub = null;
+    if (isSupabaseConfigured() && supabase?.auth) {
+      try {
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session?.user) {
+            processSession(session.user);
+          }
+        });
+        authSub = subscription;
+      } catch (e) {}
+    }
+
     return () => {
       isSubscribed = false;
+      if (authSub && typeof authSub.unsubscribe === 'function') {
+        authSub.unsubscribe();
+      }
     };
   }, []);
 

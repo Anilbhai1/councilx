@@ -210,7 +210,15 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
       case 'Admin':
         return <AdminDashboardScreen navigation={navigation} />;
       case 'Auth':
-        return <AuthScreen onAuthSuccess={() => setCurrentScreen('Home')} />;
+        return (
+          <AuthScreen 
+            onAuthSuccess={() => {
+              setIsAuthenticated(true);
+              setCurrentScreen('Home');
+              if (onAuthChange) onAuthChange(true);
+            }} 
+          />
+        );
       case 'Chat':
         return <ChatScreen route={{ params: screenParams }} navigation={navigation} />;
       case 'Syndicate':

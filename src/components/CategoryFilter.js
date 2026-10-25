@@ -102,6 +102,7 @@ export default function CategoryFilter({ categories, selectedCategory, onSelectC
 
           <ScrollView
             ref={scrollRef}
+            style={styles.scrollFlex}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.scrollContent}
@@ -178,6 +179,12 @@ const styles = StyleSheet.create({
   scrollWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    maxWidth: '100%',
+  },
+  scrollFlex: {
+    flex: 1,
+    maxWidth: '100%',
   },
   arrowBtn: {
     width: 26,

@@ -3,9 +3,9 @@
  * Bulletproof Supabase Client & Offline-First Auth Engine
  * 
  * Guarantees zero "Not Authorized / Unauthorized" login failures:
- * 1. Standard Session Persistence (persistSession: true, autoRefreshToken: true via AsyncStorage)
- * 2. Robust Local Session Override with standard quota (free_chats_remaining: 5, extra_agent_slots: 0)
- * 3. Graceful Silent Catch for Supabase RLS Policy / Anonymous Insert Rejections
+ * 1. Standard Session Persistence (persistSession: true, autoRefreshToken: true via localStorage / AsyncStorage)
+ * 2. Permanent Session Persistence: Once user logs in via Google, session remains active until explicit Logout
+ * 3. Graceful Silent Catch for Supabase RLS Policy / Profile Insert Rejections
  * 4. Dual Key Support: Primary 'COUNCILX_USER_SESSION' + Synchronized Legacy Storage Keys
  */
 
@@ -34,7 +34,7 @@ export function createStandardUserSession(overrides = {}) {
     name: userName,
     full_name: userName,
     avatar_url: avatarUrl,
-    provider: overrides.provider || 'google',
+    provider: 'google',
     free_chats_remaining: overrides.free_chats_remaining !== undefined ? overrides.free_chats_remaining : 5,
     extra_agent_slots: overrides.extra_agent_slots !== undefined ? overrides.extra_agent_slots : 0,
     is_premium: Boolean(overrides.is_premium),
@@ -61,6 +61,14 @@ function getCookie(name) {
 export function getInitialAuthSync() {
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     try {
+      // 1. Detect incoming Google OAuth return redirect hash or code
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      if (hash.includes('access_token=') || hash.includes('refresh_token=') || search.includes('code=')) {
+        return true;
+      }
+
+      // 2. Direct localStorage check
       if (window.localStorage) {
         const raw = window.localStorage.getItem(COUNCILX_USER_SESSION_KEY);
         const legacy = window.localStorage.getItem('@councilx_is_logged_in');
@@ -69,22 +77,33 @@ export function getInitialAuthSync() {
         // Inspect any active Supabase auth tokens in localStorage
         for (let i = 0; i < window.localStorage.length; i++) {
           const key = window.localStorage.key(i);
-          if (key && ((key.startsWith('sb-') && key.endsWith('-auth-token')) || key === 'supabase.auth.token' || key.includes('auth-token'))) {
+          if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
             const item = window.localStorage.getItem(key);
-            if (item && (item.includes('access_token') || item.includes('user'))) {
-              return true;
+            if (item) {
+              try {
+                const parsed = JSON.parse(item);
+                if (parsed.user || parsed.access_token || parsed.currentSession?.user) {
+                  return true;
+                }
+              } catch (e) {}
             }
           }
         }
       }
+
+      // 3. Persistent cookies fallback
       if (typeof document !== 'undefined' && document.cookie) {
-        if (document.cookie.includes('councilx_session') || document.cookie.includes('councilx_logged_in=true') || document.cookie.includes('sb-')) {
+        if (
+          document.cookie.includes('councilx_session') ||
+          document.cookie.includes('councilx_logged_in=true') ||
+          document.cookie.includes('sb-')
+        ) {
           return true;
         }
       }
     } catch (e) {}
   }
-  return null;
+  return false;
 }
 
 /**
@@ -106,8 +125,7 @@ export async function saveLocalSession(sessionInput = {}) {
       AsyncStorage.setItem('@councilx_user_email', session.email),
       AsyncStorage.setItem('@councilx_user_name', session.name),
       AsyncStorage.setItem('@councilx_user_profile', sessionString),
-      AsyncStorage.setItem('@councilx_extra_agent_slots', String(session.extra_agent_slots || 0)),
-      AsyncStorage.setItem('@councilx_free_chats_used', '0')
+      AsyncStorage.setItem('@councilx_extra_agent_slots', String(session.extra_agent_slots || 0))
     ]);
 
     // 3. Web Persistent Storage: localStorage (Survives indefinitely)
@@ -153,18 +171,23 @@ export async function getLocalSession() {
       try {
         const lsRaw = window.localStorage.getItem(COUNCILX_USER_SESSION_KEY);
         if (lsRaw) {
-          return JSON.parse(lsRaw);
+          const parsed = JSON.parse(lsRaw);
+          if (parsed && (parsed.user_id || parsed.id || parsed.email)) {
+            return parsed;
+          }
         }
         const lsLegacy = window.localStorage.getItem('@councilx_is_logged_in');
         if (lsLegacy === 'true') {
           const lsProfile = window.localStorage.getItem('@councilx_user_profile');
-          if (lsProfile) return JSON.parse(lsProfile);
+          if (lsProfile) {
+            try { return JSON.parse(lsProfile); } catch (e) {}
+          }
         }
 
         // Check for active Supabase auth tokens in localStorage
         for (let i = 0; i < window.localStorage.length; i++) {
           const key = window.localStorage.key(i);
-          if (key && (((key.startsWith('sb-') && key.endsWith('-auth-token'))) || key === 'supabase.auth.token' || key.includes('auth-token'))) {
+          if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
             try {
               const item = window.localStorage.getItem(key);
               if (item) {
@@ -191,7 +214,7 @@ export async function getLocalSession() {
     // 2. Check AsyncStorage
     const raw = await AsyncStorage.getItem(COUNCILX_USER_SESSION_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      try { return JSON.parse(raw); } catch (e) {}
     }
 
     // 3. Check persistent cookie
@@ -216,7 +239,9 @@ export async function getLocalSession() {
       const migrated = await saveLocalSession({
         ...parsed,
         user_id: legacyId || parsed.user_id,
-        email: legacyEmail || parsed.email
+        email: legacyEmail || parsed.email,
+        provider: 'google',
+        isAuthenticated: true
       });
       return migrated;
     }
@@ -241,7 +266,6 @@ export async function clearLocalSession() {
       '@councilx_user_email',
       '@councilx_user_name',
       '@councilx_user_profile',
-      '@councilx_free_chats_used',
       '@councilx_extra_agent_slots'
     ];
 
@@ -311,14 +335,12 @@ export async function safeUpsertProfile(profileData) {
 
     if (error) {
       // SILENT RLS BYPASS: RLS policy blocked the insert or auth token rejected.
-      // Log for diagnostic purposes only, never throw, never alert!
       console.warn('ℹ️ Supabase profiles RLS notice (handled silently):', error.message || error);
       return { success: true, localOnly: true, rlsBypassed: true, error: error.message };
     }
 
     return { success: true, data };
   } catch (err) {
-    // Catch network failures or any client exceptions cleanly
     console.warn('ℹ️ Supabase profiles upsert exception caught cleanly:', err?.message || err);
     return { success: true, localOnly: true, exceptionBypassed: true };
   }
@@ -349,4 +371,3 @@ export async function signInWithGoogleOAuth(customRedirect) {
 
   return { data, error };
 }
-

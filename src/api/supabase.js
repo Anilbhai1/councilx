@@ -23,43 +23,39 @@ export const isSupabaseConfigured = () => {
 
 // Bulletproof storage adapter for Supabase session persistence
 // Ensures session tokens survive browser tab closes, reloads, and long idle periods
+const isWeb = Platform.OS === 'web' && typeof window !== 'undefined';
+
 const persistentStorageAdapter = {
   getItem: (key) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        try {
-          return window.localStorage.getItem(key);
-        } catch (e) {
-          console.warn('localStorage getItem warning:', e);
-        }
+    if (isWeb && window.localStorage) {
+      try {
+        return window.localStorage.getItem(key);
+      } catch (e) {
+        console.warn('localStorage getItem warning:', e);
       }
       return null;
     }
     return AsyncStorage.getItem(key);
   },
   setItem: (key, value) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        try {
-          window.localStorage.setItem(key, value);
-          return;
-        } catch (e) {
-          console.warn('localStorage setItem warning:', e);
-        }
+    if (isWeb && window.localStorage) {
+      try {
+        window.localStorage.setItem(key, value);
+        return;
+      } catch (e) {
+        console.warn('localStorage setItem warning:', e);
       }
       return;
     }
     return AsyncStorage.setItem(key, value);
   },
   removeItem: (key) => {
-    if (Platform.OS === 'web') {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        try {
-          window.localStorage.removeItem(key);
-          return;
-        } catch (e) {
-          console.warn('localStorage removeItem warning:', e);
-        }
+    if (isWeb && window.localStorage) {
+      try {
+        window.localStorage.removeItem(key);
+        return;
+      } catch (e) {
+        console.warn('localStorage removeItem warning:', e);
       }
       return;
     }
@@ -76,7 +72,7 @@ if (isSupabaseConfigured()) {
         storage: persistentStorageAdapter,
         persistSession: true,
         autoRefreshToken: true,
-        detectSessionInUrl: Platform.OS === 'web',
+        detectSessionInUrl: isWeb,
       },
     });
   } catch (err) {
@@ -85,4 +81,3 @@ if (isSupabaseConfigured()) {
 }
 
 export const supabase = supabaseInstance;
-

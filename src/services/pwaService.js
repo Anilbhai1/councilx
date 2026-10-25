@@ -167,10 +167,16 @@ class PWAService {
   }
 
   canPromptDirectly() {
+    if (!this.deferredPrompt && typeof window !== 'undefined' && window.__councilx_deferred_prompt) {
+      this.deferredPrompt = window.__councilx_deferred_prompt;
+    }
     return Boolean(this.deferredPrompt);
   }
 
   async promptInstall() {
+    if (!this.deferredPrompt && typeof window !== 'undefined' && window.__councilx_deferred_prompt) {
+      this.deferredPrompt = window.__councilx_deferred_prompt;
+    }
     if (!this.deferredPrompt) {
       return {
         success: false,
