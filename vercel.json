@@ -35,7 +35,31 @@
       "destination": "/api/:path*"
     },
     {
-      "source": "/((?!api/|_expo/|assets/|icons/|favicon.ico|manifest.json|sw.js|.*\\.png$).*)",
+      "source": "/admin",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pricing",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/pricing/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/success",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/success/:path*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]

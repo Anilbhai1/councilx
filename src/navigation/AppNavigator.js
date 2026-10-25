@@ -47,7 +47,13 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
           hash.includes('admin')
         ) {
           // STRICT RBAC CHECK: Verify authenticated email is arshitchodavadiya@gmail.com
-          const activeEmail = await adminService.getActiveUserEmail();
+          let activeEmail = await adminService.getActiveUserEmail();
+          if (!activeEmail) {
+            // Allow auth session up to 400ms to hydrate on direct page load
+            await new Promise(r => setTimeout(r, 400));
+            activeEmail = await adminService.getActiveUserEmail();
+          }
+
           if (isSovereignEmail(activeEmail)) {
             setCurrentScreen('Admin');
           } else {
