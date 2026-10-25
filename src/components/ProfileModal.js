@@ -517,6 +517,24 @@ export default function ProfileModal({ visible, onClose, onOpenPaywall, onOpenPr
               )}
             </View>
 
+            {/* Sovereign Admin Terminal Shortcut (Exclusively for arshitchodavadiya@gmail.com) */}
+            {userEmail?.toLowerCase() === 'arshitchodavadiya@gmail.com' ? (
+              <TouchableOpacity
+                style={styles.adminTerminalBtn}
+                onPress={() => {
+                  onClose?.();
+                  navigation?.navigate('Admin');
+                }}
+                activeOpacity={0.85}
+              >
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Ionicons name="shield-checkmark" size={16} color="#00F0FF" />
+                  <Text style={styles.adminTerminalBtnText}>⚡ OPEN SOVEREIGN ADMIN TERMINAL</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={14} color="#00F0FF" />
+              </TouchableOpacity>
+            ) : null}
+
             {/* 5. Terms & Conditions Modal Link */}
             <TouchableOpacity
               style={styles.termsFooterBtn}
@@ -1149,5 +1167,24 @@ const styles = StyleSheet.create({
     color: '#E5E7EB',
     fontSize: 11.5,
     fontWeight: '700',
+  },
+  adminTerminalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#091518',
+    borderWidth: 1,
+    borderColor: '#00F0FF',
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 14,
+    marginBottom: 6
+  },
+  adminTerminalBtnText: {
+    color: '#00F0FF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 0.8
   },
 });

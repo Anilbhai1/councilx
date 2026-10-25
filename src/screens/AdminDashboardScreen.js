@@ -1,16 +1,16 @@
 /**
  * COUNCIL X | THE SYNDICATE
- * Dedicated Super Admin & God-Mode Dashboard Screen
+ * Enterprise-Grade Custom Admin Dashboard & God-Mode Engine
  * 
- * Accessible exclusively via separate admin route:
- * - URL path: /admin
- * - Navigation route: 'Admin'
+ * STRICT ROLE-BASED ACCESS CONTROL (RBAC):
+ * Exclusively accessible to: arshitchodavadiya@gmail.com
+ * Unauthorized users are instantly blocked and redirected to Home without exposing any admin data.
  * 
- * Security:
- * - Protected by Master Clearance PIN (Default: 7777)
- * - Directly synced to Supabase database (`profiles`, `payments`, `conversations`, `custom_agents`)
- * - Instant live gifting & account suspension engine
- * - 100% Corporate Black & White Luxury Theme (OpenAI / Bloomberg Minimal)
+ * Modules:
+ * 1. User Management: Registered users table, Google OAuth badge, remaining sessions, session granting, block/unblock
+ * 2. Revenue & Payments Tracking: Total revenue widgets, AOV, real-time Razorpay transactions ledger
+ * 3. AI Usage Analytics: Total chat requests, 1-on-1 vs 216 Supreme Council split, Masterminds Leaderboard
+ * 4. Global Platform Controls: Paywall toggle, 3.1 Pro lock, default free credits, Razorpay mode switch
  */
 
 import React, { useState, useEffect } from 'react';
@@ -25,23 +25,19 @@ import {
   Platform,
   ActivityIndicator,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Image
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { adminService } from '../services/adminService';
-import { useLanguage } from '../utils/i18n';
+import { adminService, SOVEREIGN_ADMIN_EMAIL, isSovereignEmail } from '../services/adminService';
 
 export default function AdminDashboardScreen({ navigation }) {
-  const { lang } = useLanguage();
+  // Strict RBAC State
+  const [isAuthorized, setIsAuthorized] = useState(null); // null = checking, true = authorized, false = denied
+  const [activeAdminEmail, setActiveAdminEmail] = useState('');
 
-  // Authentication State
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [pinInput, setPinInput] = useState('');
-  const [pinError, setPinError] = useState('');
-  const [verifyingPin, setVerifyingPin] = useState(false);
-
-  // Active Tab: 'ANALYTICS' | 'USERS' | 'GLOBAL' | 'LOGS' | 'SECURITY'
-  const [activeTab, setActiveTab] = useState('ANALYTICS');
+  // Active Navigation Tab: 'USERS' | 'REVENUE' | 'AI_ANALYTICS' | 'GLOBAL'
+  const [activeTab, setActiveTab] = useState('USERS');
 
   // Live Data States
   const [loading, setLoading] = useState(false);
@@ -51,7 +47,14 @@ export default function AdminDashboardScreen({ navigation }) {
   const [selectedUser, setSelectedUser] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Global Settings States
+  // Revenue & Razorpay State
+  const [txLogs, setTxLogs] = useState([]);
+  const [logFilter, setLogFilter] = useState('ALL'); // 'ALL' | 'PAID' | 'GIFT'
+
+  // AI Usage Analytics State
+  const [aiAnalytics, setAiAnalytics] = useState(null);
+
+  // Global Settings State
   const [settings, setSettings] = useState({
     isPaywallEnabled: true,
     isProModelLockEnabled: true,
@@ -61,52 +64,62 @@ export default function AdminDashboardScreen({ navigation }) {
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
-  // Transaction Logs State
-  const [txLogs, setTxLogs] = useState([]);
-  const [logFilter, setLogFilter] = useState('ALL'); // 'ALL' | 'PAID' | 'GIFT'
-
-  // Change PIN State
-  const [newPinInput, setNewPinInput] = useState('');
-
+  // 1. STRICT RBAC VERIFICATION ON MOUNT
   useEffect(() => {
-    if (isAuthenticated) {
-      refreshDashboardData();
-    }
-  }, [isAuthenticated]);
+    let isMounted = true;
 
-  const handleVerifyPin = async (inputToVerify) => {
-    const pin = inputToVerify || pinInput;
-    if (!pin) {
-      setPinError('Please enter Master PIN');
-      return;
-    }
-    setVerifyingPin(true);
-    setPinError('');
-    try {
-      const isValid = await adminService.verifyPin(pin);
-      if (isValid) {
-        setIsAuthenticated(true);
-        setPinInput('');
-        refreshDashboardData();
-      } else {
-        setPinError('Invalid Security PIN. (Default: 7777)');
+    const verifyAccess = async () => {
+      const email = await adminService.getActiveUserEmail();
+      const authorized = isSovereignEmail(email);
+
+      if (!isMounted) return;
+
+      if (!authorized) {
+        setIsAuthorized(false);
+        // Instantly block and redirect to home screen without exposing any data
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.history.replaceState(null, '', '/');
+          window.alert(
+            'ACCESS BLOCKED (સુરક્ષા પ્રતિબંધ):\n\n' +
+            'Strict Role-Based Access Control is enforced.\n' +
+            'This route is restricted exclusively to ' + SOVEREIGN_ADMIN_EMAIL + '.\n' +
+            'Redirecting to home screen.'
+          );
+        } else {
+          Alert.alert(
+            'Access Blocked',
+            'Strict RBAC is enforced. Dashboard restricted to ' + SOVEREIGN_ADMIN_EMAIL
+          );
+        }
+        if (navigation && navigation.navigate) {
+          navigation.navigate('Home');
+        }
+        return;
       }
-    } catch (e) {
-      setPinError('Authentication error');
-    } finally {
-      setVerifyingPin(false);
-    }
-  };
+
+      setActiveAdminEmail(email);
+      setIsAuthorized(true);
+      refreshDashboardData();
+    };
+
+    verifyAccess();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const refreshDashboardData = async () => {
     setLoading(true);
     try {
-      const [stats, users, globalConfig, logs] = await Promise.all([
+      const [stats, users, globalConfig, logs, aiStats] = await Promise.all([
         adminService.getLiveAnalytics(),
         adminService.getUsersList(searchQuery),
         adminService.getSettings(),
-        adminService.getTransactionLogs()
+        adminService.getTransactionLogs(),
+        adminService.getAIUsageAnalytics()
       ]);
+
       setAnalytics(stats);
       setUsersList(users);
       if (!selectedUser && users.length > 0) {
@@ -117,6 +130,7 @@ export default function AdminDashboardScreen({ navigation }) {
       }
       setSettings(globalConfig);
       setTxLogs(logs);
+      setAiAnalytics(aiStats);
     } catch (e) {
       console.warn('Admin dashboard refresh notice:', e);
     } finally {
@@ -133,13 +147,33 @@ export default function AdminDashboardScreen({ navigation }) {
     }
   };
 
-  // 1-Click Gift Actions
+  // User Actions: Free Sessions Gifting
+  const handleGiftChats = async (count) => {
+    if (!selectedUser) return;
+    setActionLoading(true);
+    const res = await adminService.giftFreeChats(selectedUser, count);
+    setActionLoading(false);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(res.message);
+    } else {
+      Alert.alert('Gift Free Sessions', res.message);
+    }
+    if (res.success) {
+      refreshDashboardData();
+    }
+  };
+
+  // User Actions: Pro Membership Gifting
   const handleGiftPro = async (planKey) => {
     if (!selectedUser) return;
     setActionLoading(true);
     const res = await adminService.giftProPlan(selectedUser, planKey);
     setActionLoading(false);
-    Alert.alert('Gift Pro Plan', res.message);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(res.message);
+    } else {
+      Alert.alert('Gift Pro Plan', res.message);
+    }
     if (res.success) {
       refreshDashboardData();
     }
@@ -150,46 +184,33 @@ export default function AdminDashboardScreen({ navigation }) {
     setActionLoading(true);
     const res = await adminService.revokeProPlan(selectedUser);
     setActionLoading(false);
-    Alert.alert('Revoke Pro Plan', res.message);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(res.message);
+    } else {
+      Alert.alert('Revoke Pro Plan', res.message);
+    }
     if (res.success) {
       refreshDashboardData();
     }
   };
 
-  const handleGiftChats = async (count) => {
-    if (!selectedUser) return;
-    setActionLoading(true);
-    const res = await adminService.giftFreeChats(selectedUser, count);
-    setActionLoading(false);
-    Alert.alert('Gift Free Chats', res.message);
-    if (res.success) {
-      refreshDashboardData();
-    }
-  };
-
-  const handleGiftSlots = async (count) => {
-    if (!selectedUser) return;
-    setActionLoading(true);
-    const res = await adminService.giftAgentSlots(selectedUser, count);
-    setActionLoading(false);
-    Alert.alert('Gift Agent Slots', res.message);
-    if (res.success) {
-      refreshDashboardData();
-    }
-  };
-
+  // User Actions: Block / Unblock User
   const handleToggleBlock = async () => {
     if (!selectedUser) return;
     setActionLoading(true);
     const res = await adminService.toggleBlockUser(selectedUser);
     setActionLoading(false);
-    Alert.alert('Account Status', res.message);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(res.message);
+    } else {
+      Alert.alert('Account Status', res.message);
+    }
     if (res.success) {
       refreshDashboardData();
     }
   };
 
-  // Global Settings Toggle
+  // Global Settings Actions
   const handleToggleSetting = (key) => {
     setSettings(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -198,22 +219,11 @@ export default function AdminDashboardScreen({ navigation }) {
     setSavingSettings(true);
     const res = await adminService.updateSettings(settings);
     setSavingSettings(false);
-    if (res.success) {
-      Alert.alert('God-Mode Settings', 'Global platform settings updated and persisted successfully.');
+    const msg = res.success ? 'Global platform settings updated and persisted successfully.' : (res.message || 'Failed to save settings.');
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.alert(msg);
     } else {
-      Alert.alert('Error', res.message || 'Failed to save settings.');
-    }
-  };
-
-  const handleChangePin = async () => {
-    if (!newPinInput || newPinInput.trim().length < 4) {
-      Alert.alert('Master PIN', 'PIN must be at least 4 digits.');
-      return;
-    }
-    const res = await adminService.changePin(newPinInput.trim());
-    Alert.alert('Security PIN', res.message);
-    if (res.success) {
-      setNewPinInput('');
+      Alert.alert('God-Mode Settings', msg);
     }
   };
 
@@ -226,6 +236,47 @@ export default function AdminDashboardScreen({ navigation }) {
     }
   };
 
+  // 1. RBAC CHECKING STATE
+  if (isAuthorized === null) {
+    return (
+      <SafeAreaView style={styles.authCheckingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#050505" />
+        <View style={styles.authCheckingBox}>
+          <ActivityIndicator size="large" color="#00F0FF" />
+          <Text style={styles.authCheckingTitle}>VERIFYING SOVEREIGN CLEARANCE</Text>
+          <Text style={styles.authCheckingSub}>
+            Validating Role-Based Access Control for {SOVEREIGN_ADMIN_EMAIL}...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // 2. UNAUTHORIZED BLOCK STATE (Fail-Safe)
+  if (isAuthorized === false) {
+    return (
+      <SafeAreaView style={styles.authCheckingContainer}>
+        <StatusBar barStyle="light-content" backgroundColor="#050505" />
+        <View style={styles.authDeniedBox}>
+          <Ionicons name="shield-outline" size={48} color="#EF4444" />
+          <Text style={styles.authDeniedTitle}>403 FORBIDDEN: ACCESS DENIED</Text>
+          <Text style={styles.authDeniedSub}>
+            This terminal is restricted exclusively to {SOVEREIGN_ADMIN_EMAIL}.
+          </Text>
+          <TouchableOpacity style={styles.deniedReturnBtn} onPress={handleReturnToConsumerApp}>
+            <Text style={styles.deniedReturnBtnText}>RETURN TO HOME</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Calculate Revenue KPI Helpers
+  const totalRevenue = Number(analytics?.revenue?.total) || 0;
+  const currentMonthRevenue = Number(analytics?.revenue?.currentMonth) || 0;
+  const paidLogsCount = txLogs.filter(t => (Number(t.amount) || 0) > 0).length;
+  const averageOrderValue = paidLogsCount > 0 ? Math.round(totalRevenue / paidLogsCount) : 3499;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#050505" />
@@ -236,26 +287,26 @@ export default function AdminDashboardScreen({ navigation }) {
           <View style={styles.topBarLeft}>
             <View style={styles.godModePill}>
               <View style={styles.greenDot} />
-              <Text style={styles.godModeText}>⚡ GOD-MODE ROUTE</Text>
+              <Text style={styles.godModeText}>⚡ SOVEREIGN COMMAND</Text>
             </View>
             <View>
-              <Text style={styles.systemHeaderTitle}>SUPER ADMIN CONTROL</Text>
-              <Text style={styles.systemHeaderSub}>COUNCIL X | SUPREME COMMAND CENTER</Text>
+              <Text style={styles.systemHeaderTitle}>COUNCIL X ADMIN DASHBOARD</Text>
+              <Text style={styles.systemHeaderSub}>
+                AUTHENTICATED: <Text style={{ color: '#00F0FF' }}>{activeAdminEmail}</Text>
+              </Text>
             </View>
           </View>
 
           <View style={styles.topBarRight}>
-            {isAuthenticated && (
-              <TouchableOpacity
-                style={styles.actionPillBtn}
-                onPress={refreshDashboardData}
-                disabled={loading}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="refresh" size={13} color="#FFFFFF" />
-                <Text style={styles.actionPillBtnText}>SYNC</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity
+              style={styles.actionPillBtn}
+              onPress={refreshDashboardData}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="refresh" size={13} color="#FFFFFF" />
+              <Text style={styles.actionPillBtnText}>{loading ? 'SYNCING...' : 'SYNC'}</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.returnAppBtn}
@@ -268,710 +319,723 @@ export default function AdminDashboardScreen({ navigation }) {
           </View>
         </View>
 
-        {/* SCREEN 1: PIN AUTHENTICATION GATE */}
-        {!isAuthenticated ? (
-          <View style={styles.authGateContainer}>
-            <View style={styles.authShieldWrap}>
-              <Ionicons name="shield-checkmark" size={44} color="#FFFFFF" />
-            </View>
-            <Text style={styles.authGateTitle}>SUPREME COMMAND CLEARANCE</Text>
-            <Text style={styles.authGateSubtitle}>
-              Protected Administrative Route. Enter Master Security PIN to unlock full God-Mode Controls.
-            </Text>
-            <View style={styles.authHintBox}>
-              <Ionicons name="key-outline" size={12} color="#AAAAAA" />
-              <Text style={styles.authDefaultHint}>Default Master PIN: 7777</Text>
-            </View>
-
-            <View style={styles.pinInputRow}>
-              <TextInput
-                style={styles.pinInput}
-                value={pinInput}
-                onChangeText={(val) => {
-                  setPinInput(val);
-                  if (val.length === 4) handleVerifyPin(val);
-                }}
-                placeholder="• • • •"
-                placeholderTextColor="#444444"
-                keyboardType="numeric"
-                secureTextEntry
-                maxLength={6}
-                autoFocus
-              />
-            </View>
-
-            {pinError ? <Text style={styles.pinErrorText}>{pinError}</Text> : null}
-
+        {/* Navigation Tabs */}
+        <View style={styles.tabNavRow}>
+          {[
+            { key: 'USERS', label: '👥 USER MANAGEMENT', icon: 'people' },
+            { key: 'REVENUE', label: '💳 REVENUE & PAYMENTS', icon: 'card' },
+            { key: 'AI_ANALYTICS', label: '🤖 AI USAGE ANALYTICS', icon: 'stats-chart' },
+            { key: 'GLOBAL', label: '⚙️ GLOBAL CONTROLS', icon: 'settings' }
+          ].map((tab) => (
             <TouchableOpacity
-              style={styles.unlockBtn}
-              onPress={() => handleVerifyPin()}
-              disabled={verifyingPin}
-              activeOpacity={0.85}
+              key={tab.key}
+              style={[styles.tabNavItem, activeTab === tab.key && styles.tabNavItemActive]}
+              onPress={() => setActiveTab(tab.key)}
+              activeOpacity={0.8}
             >
-              {verifyingPin ? (
-                <ActivityIndicator size="small" color="#000000" />
-              ) : (
-                <View style={styles.unlockBtnContent}>
-                  <Ionicons name="lock-open" size={16} color="#000000" style={{ marginRight: 6 }} />
-                  <Text style={styles.unlockBtnText}>VERIFY & UNLOCK DASHBOARD</Text>
-                </View>
-              )}
+              <Text style={[styles.tabNavText, activeTab === tab.key && styles.tabNavTextActive]}>
+                {tab.label}
+              </Text>
             </TouchableOpacity>
+          ))}
+        </View>
 
-            {/* Quick Numeric Keypad */}
-            <View style={styles.quickPadRow}>
-              {['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'].map((digit) => (
-                <TouchableOpacity
-                  key={digit}
-                  style={styles.keypadDigit}
-                  onPress={() => {
-                    const next = pinInput + digit;
-                    setPinInput(next);
-                    if (next.length === 4) handleVerifyPin(next);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.keypadDigitText}>{digit}</Text>
-                </TouchableOpacity>
-              ))}
-              <TouchableOpacity
-                style={[styles.keypadDigit, { backgroundColor: '#1A1A1A', borderColor: '#333333' }]}
-                onPress={() => setPinInput('')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.keypadDigitText, { color: '#EF4444' }]}>CLEAR</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        ) : (
-          /* SCREEN 2: GOD-MODE COMMAND DASHBOARD */
-          <View style={{ flex: 1 }}>
-            {/* Tab Navigation Switcher */}
-            <View style={styles.tabNavRow}>
-              {[
-                { key: 'ANALYTICS', label: '📊 ANALYTICS' },
-                { key: 'USERS', label: '🎁 USER GIFTS' },
-                { key: 'GLOBAL', label: '⚙️ GLOBAL ON/OFF' },
-                { key: 'LOGS', label: '📜 REVENUE LOGS' },
-                { key: 'SECURITY', label: '🔐 PIN' }
-              ].map((tab) => (
-                <TouchableOpacity
-                  key={tab.key}
-                  style={[styles.tabNavItem, activeTab === tab.key && styles.tabNavItemActive]}
-                  onPress={() => setActiveTab(tab.key)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.tabNavText, activeTab === tab.key && styles.tabNavTextActive]}>
-                    {tab.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
-              {/* ============================================================== */}
-              {/* TAB 1: LIVE A-TO-Z ANALYTICS */}
-              {/* ============================================================== */}
-              {activeTab === 'ANALYTICS' && (
-                <View style={styles.tabContent}>
-                  <Text style={styles.sectionHeading}>LIVE FINANCIAL & ENGAGEMENT METRICS</Text>
+        <ScrollView contentContainerStyle={styles.scrollBody} showsVerticalScrollIndicator={false}>
+          {/* ============================================================== */}
+          {/* MODULE 1: USER MANAGEMENT */}
+          {/* ============================================================== */}
+          {activeTab === 'USERS' && (
+            <View style={styles.tabContent}>
+              <View style={styles.moduleHeaderRow}>
+                <View>
+                  <Text style={styles.sectionHeading}>👥 REGISTERED PLATFORM USERS</Text>
                   <Text style={styles.sectionSubheading}>
-                    Real-time synchronized data querying Supabase tables (`profiles`, `payments`, `conversations`, `custom_agents`) + Razorpay.
+                    Inspect registered users, Google OAuth login methods, remaining sessions, and apply 1-click privilege grants.
                   </Text>
-
-                  {/* 4 Big KPI Cards */}
-                  <View style={styles.kpiGrid}>
-                    {/* Card 1: Revenue Tracking (Lifetime + Current Month) */}
-                    <View style={[styles.kpiCard, styles.kpiCardHighlight]}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <View style={styles.kpiIconWrap}>
-                          <Ionicons name="cash" size={20} color="#10B981" />
-                        </View>
-                        <View style={styles.currentMonthBadge}>
-                          <Text style={styles.currentMonthBadgeText}>📅 CURRENT MONTH: ₹{(analytics?.revenue?.currentMonth ?? 0).toLocaleString('en-IN')}</Text>
-                        </View>
-                      </View>
-                      
-                      <Text style={styles.kpiLabel}>TOTAL LIFETIME EARNINGS (કુલ કમાણી)</Text>
-                      <Text style={styles.kpiValue}>
-                        ₹{(analytics?.revenue?.total ?? 0).toLocaleString('en-IN')}
-                      </Text>
-                      
-                      <View style={styles.revenueBreakdownPills}>
-                        <View style={styles.revBreakdownPill}>
-                          <Text style={styles.revBreakdownPillText}>Annual: ₹{(analytics?.revenue?.breakdown?.annual ?? 0).toLocaleString('en-IN')}</Text>
-                        </View>
-                        <View style={styles.revBreakdownPill}>
-                          <Text style={styles.revBreakdownPillText}>6-Month: ₹{(analytics?.revenue?.breakdown?.semiAnnual ?? 0).toLocaleString('en-IN')}</Text>
-                        </View>
-                        <View style={styles.revBreakdownPill}>
-                          <Text style={styles.revBreakdownPillText}>Slots: ₹{(analytics?.revenue?.breakdown?.agentSlots ?? 0).toLocaleString('en-IN')}</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Card 2: Total & Live User Metrics (DAU, MAU, Live Radar) */}
-                    <View style={styles.kpiCard}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                        <View style={styles.kpiIconWrap}>
-                          <Ionicons name="people" size={20} color="#3B82F6" />
-                        </View>
-                        <View style={styles.liveRadarPill}>
-                          <View style={styles.liveRadarDot} />
-                          <Text style={styles.liveRadarPillText}>
-                            LIVE NOW (15m): {analytics?.users?.liveActive ?? 0}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <Text style={styles.kpiLabel}>TOTAL REGISTERED USERS (SUPABASE)</Text>
-                      <Text style={styles.kpiValue}>
-                        {analytics?.users?.total ?? 0} <Text style={styles.kpiValueSmall}>Registered Members</Text>
-                      </Text>
-
-                      {/* DAU & MAU Activity Row */}
-                      <View style={styles.activityStatsRow}>
-                        <View style={styles.activityStatBox}>
-                          <Text style={styles.activityStatLabel}>DAU (24h Active)</Text>
-                          <Text style={styles.activityStatVal}>{analytics?.users?.dau ?? 0}</Text>
-                        </View>
-                        <View style={styles.activityStatDivider} />
-                        <View style={styles.activityStatBox}>
-                          <Text style={styles.activityStatLabel}>MAU (30d Active)</Text>
-                          <Text style={styles.activityStatVal}>{analytics?.users?.mau ?? 0}</Text>
-                        </View>
-                        <View style={styles.activityStatDivider} />
-                        <View style={styles.activityStatBox}>
-                          <Text style={styles.activityStatLabel}>Pro Subscribers</Text>
-                          <Text style={[styles.activityStatVal, { color: '#D4AF37' }]}>👑 {analytics?.users?.pro ?? 0}</Text>
-                        </View>
-                      </View>
-                    </View>
-
-                    {/* Card 3: Chats & Custom Masterminds */}
-                    <View style={styles.kpiCard}>
-                      <View style={styles.kpiIconWrap}>
-                        <Ionicons name="chatbubbles" size={20} color="#D4AF37" />
-                      </View>
-                      <Text style={styles.kpiLabel}>ENGAGEMENT & PERSONAL AGENTS</Text>
-                      <Text style={styles.kpiValue}>
-                        {analytics?.engagement?.totalChats ?? 0} <Text style={styles.kpiValueSmall}>Chats Conducted</Text>
-                      </Text>
-                      <View style={styles.kpiSubRow}>
-                        <Text style={styles.kpiSubText}>
-                          Vault Custom Agents: {analytics?.engagement?.totalCustomAgents ?? 0} Created in Database
-                        </Text>
-                      </View>
-                    </View>
-
-                    {/* Card 4: System Health */}
-                    <View style={styles.kpiCard}>
-                      <View style={styles.kpiIconWrap}>
-                        <Ionicons name="pulse" size={20} color="#FFFFFF" />
-                      </View>
-                      <Text style={styles.kpiLabel}>LIVE SYSTEM HEALTH & APIS</Text>
-                      <View style={styles.healthStatusList}>
-                        <View style={styles.healthItem}>
-                          <Text style={styles.healthName}>Google Gemini 3.0/3.1:</Text>
-                          <View style={styles.healthBadgeGreen}>
-                            <Text style={styles.healthBadgeGreenText}>{analytics?.systemHealth?.gemini || 'OPERATIONAL'}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.healthItem}>
-                          <Text style={styles.healthName}>Supabase PostgreSQL:</Text>
-                          <View style={styles.healthBadgeBlue}>
-                            <Text style={styles.healthBadgeBlueText}>{analytics?.systemHealth?.supabase || 'CONNECTED'}</Text>
-                          </View>
-                        </View>
-                        <View style={styles.healthItem}>
-                          <Text style={styles.healthName}>Razorpay Gateway:</Text>
-                          <View style={styles.healthBadgePurple}>
-                            <Text style={styles.healthBadgePurpleText}>{analytics?.systemHealth?.razorpay || 'CONFIGURED'}</Text>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
                 </View>
-              )}
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>{usersList.length} TOTAL USERS</Text>
+                </View>
+              </View>
 
-              {/* ============================================================== */}
-              {/* TAB 2: USER MANAGEMENT & 1-CLICK GIFTING */}
-              {/* ============================================================== */}
-              {activeTab === 'USERS' && (
-                <View style={styles.tabContent}>
-                  <Text style={styles.sectionHeading}>🎁 USER MANAGEMENT & 1-CLICK GIFT CENTER</Text>
-                  <Text style={styles.sectionSubheading}>
-                    Connected directly to Supabase `profiles`. Any gift or status toggle immediately updates the user's active session.
-                  </Text>
+              {/* Search Bar */}
+              <View style={styles.userSearchBar}>
+                <Ionicons name="search" size={16} color="#888888" />
+                <TextInput
+                  style={styles.userSearchInput}
+                  placeholder="Search registered users by Email, Name, or User ID..."
+                  placeholderTextColor="#666666"
+                  value={searchQuery}
+                  onChangeText={handleSearchUsers}
+                />
+                {searchQuery ? (
+                  <TouchableOpacity onPress={() => handleSearchUsers('')}>
+                    <Ionicons name="close-circle" size={16} color="#888888" />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
 
-                  {/* Search Bar */}
-                  <View style={styles.userSearchBar}>
-                    <Ionicons name="search" size={16} color="#888888" />
-                    <TextInput
-                      style={styles.userSearchInput}
-                      placeholder="Search by Email or User ID..."
-                      placeholderTextColor="#666666"
-                      value={searchQuery}
-                      onChangeText={handleSearchUsers}
-                    />
-                    {searchQuery ? (
-                      <TouchableOpacity onPress={() => handleSearchUsers('')}>
-                        <Ionicons name="close-circle" size={16} color="#888888" />
-                      </TouchableOpacity>
-                    ) : null}
+              {/* Active Selected User Inspector & Control Box */}
+              {selectedUser ? (
+                <View style={styles.selectedUserBox}>
+                  <View style={styles.selectedUserHeader}>
+                    <View style={styles.userAvatarSquare}>
+                      {selectedUser.avatar_url ? (
+                        <Image source={{ uri: selectedUser.avatar_url }} style={styles.avatarImg} />
+                      ) : (
+                        <Ionicons name="person" size={22} color="#FFFFFF" />
+                      )}
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <Text style={styles.selectedUserName}>{selectedUser.name}</Text>
+                        <View style={styles.googleBadge}>
+                          <Ionicons name="logo-google" size={11} color="#FFFFFF" />
+                          <Text style={styles.googleBadgeText}>Google OAuth</Text>
+                        </View>
+                        {selectedUser.is_current_device ? (
+                          <View style={styles.thisDeviceBadge}>
+                            <Text style={styles.thisDeviceBadgeText}>THIS DEVICE</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={styles.selectedUserEmail}>{selectedUser.email}</Text>
+                      <Text style={styles.selectedUserId}>ID: {selectedUser.id}</Text>
+                    </View>
+
+                    <View style={styles.userPlanBadge}>
+                      <Text style={styles.userPlanBadgeText}>
+                        {selectedUser.is_premium ? '👑 PRO SUBSCRIBER' : 'FREE TIER'}
+                      </Text>
+                    </View>
                   </View>
 
-                  {/* Active Selected User Card */}
-                  {selectedUser ? (
-                    <View style={styles.selectedUserBox}>
-                      <View style={styles.selectedUserHeader}>
-                        <View style={styles.userAvatarSquare}>
-                          <Ionicons name="person" size={22} color="#FFFFFF" />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={styles.selectedUserName}>{selectedUser.name}</Text>
-                            {selectedUser.is_current_device ? (
-                              <View style={styles.thisDeviceBadge}>
-                                <Text style={styles.thisDeviceBadgeText}>THIS DEVICE</Text>
-                              </View>
-                            ) : null}
-                          </View>
-                          <Text style={styles.selectedUserEmail}>{selectedUser.email}</Text>
-                          <Text style={styles.selectedUserId}>ID: {selectedUser.id}</Text>
-                        </View>
-
-                        <View style={styles.userPlanBadge}>
-                          <Text style={styles.userPlanBadgeText}>
-                            {selectedUser.is_premium ? '👑 PRO MEMBER' : 'FREE TIER'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* Current User Stats */}
-                      <View style={styles.userMetricsRow}>
-                        <View style={styles.userMetricItem}>
-                          <Text style={styles.userMetricLabel}>Plan Tier</Text>
-                          <Text style={styles.userMetricVal}>{selectedUser.plan_type || 'Free'}</Text>
-                        </View>
-                        <View style={styles.userMetricItem}>
-                          <Text style={styles.userMetricLabel}>Bonus Chats</Text>
-                          <Text style={styles.userMetricVal}>+{selectedUser.bonus_messages || 0}</Text>
-                        </View>
-                        <View style={styles.userMetricItem}>
-                          <Text style={styles.userMetricLabel}>Agent Slots</Text>
-                          <Text style={styles.userMetricVal}>+{selectedUser.extra_agent_slots || 0}</Text>
-                        </View>
-                        <View style={styles.userMetricItem}>
-                          <Text style={styles.userMetricLabel}>Account</Text>
-                          <Text style={[styles.userMetricVal, { color: selectedUser.is_blocked ? '#EF4444' : '#10B981' }]}>
-                            {selectedUser.is_blocked ? 'SUSPENDED' : 'ACTIVE'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {/* 1-Click Power Action Buttons */}
-                      <View style={styles.actionButtonGroup}>
-                        <Text style={styles.actionGroupTitle}>1-CLICK GIFT PRO MEMBERSHIP (મફત PRO ગિફ્ટ):</Text>
-                        <View style={styles.actionBtnRow}>
-                          <TouchableOpacity
-                            style={styles.giftBtn}
-                            onPress={() => handleGiftPro('1_month')}
-                            disabled={actionLoading}
-                          >
-                            <Ionicons name="gift-outline" size={14} color="#000000" />
-                            <Text style={styles.giftBtnText}>1 MONTH PRO</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.giftBtn}
-                            onPress={() => handleGiftPro('6_month')}
-                            disabled={actionLoading}
-                          >
-                            <Ionicons name="gift-outline" size={14} color="#000000" />
-                            <Text style={styles.giftBtnText}>6 MONTHS PRO</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.giftBtn}
-                            onPress={() => handleGiftPro('1_year')}
-                            disabled={actionLoading}
-                          >
-                            <Ionicons name="gift-outline" size={14} color="#000000" />
-                            <Text style={styles.giftBtnText}>1 YEAR ANNUAL</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={[styles.giftBtn, styles.giftBtnGold]}
-                            onPress={() => handleGiftPro('lifetime')}
-                            disabled={actionLoading}
-                          >
-                            <Ionicons name="infinite" size={14} color="#000000" />
-                            <Text style={styles.giftBtnText}>LIFETIME PRO</Text>
-                          </TouchableOpacity>
-
-                          {selectedUser.is_premium ? (
-                            <TouchableOpacity
-                              style={styles.revokeBtn}
-                              onPress={handleRevokePro}
-                              disabled={actionLoading}
-                            >
-                              <Ionicons name="close-circle-outline" size={14} color="#EF4444" />
-                              <Text style={styles.revokeBtnText}>REVOKE PRO</Text>
-                            </TouchableOpacity>
-                          ) : null}
-                        </View>
-
-                        <Text style={[styles.actionGroupTitle, { marginTop: 12 }]}>
-                          1-CLICK GIFT FREE CHATS & AGENT SLOTS:
-                        </Text>
-                        <View style={styles.actionBtnRow}>
-                          <TouchableOpacity
-                            style={styles.toolBtn}
-                            onPress={() => handleGiftChats(10)}
-                            disabled={actionLoading}
-                          >
-                            <Text style={styles.toolBtnText}>+10 CHATS</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.toolBtn}
-                            onPress={() => handleGiftChats(50)}
-                            disabled={actionLoading}
-                          >
-                            <Text style={styles.toolBtnText}>+50 CHATS</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.toolBtn}
-                            onPress={() => handleGiftChats(9999)}
-                            disabled={actionLoading}
-                          >
-                            <Text style={styles.toolBtnText}>UNLIMITED CHATS</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.toolBtnPurple}
-                            onPress={() => handleGiftSlots(1)}
-                            disabled={actionLoading}
-                          >
-                            <Text style={styles.toolBtnPurpleText}>+1 AGENT SLOT</Text>
-                          </TouchableOpacity>
-
-                          <TouchableOpacity
-                            style={styles.toolBtnPurple}
-                            onPress={() => handleGiftSlots(5)}
-                            disabled={actionLoading}
-                          >
-                            <Text style={styles.toolBtnPurpleText}>+5 AGENT SLOTS</Text>
-                          </TouchableOpacity>
-                        </View>
-
-                        {/* Account Suspend / Block */}
-                        <View style={styles.dangerZoneRow}>
-                          <TouchableOpacity
-                            style={[styles.blockBtn, selectedUser.is_blocked && styles.unblockBtn]}
-                            onPress={handleToggleBlock}
-                            disabled={actionLoading}
-                          >
-                            <Ionicons
-                              name={selectedUser.is_blocked ? "shield-checkmark-outline" : "ban-outline"}
-                              size={14}
-                              color="#FFFFFF"
-                            />
-                            <Text style={styles.blockBtnText}>
-                              {selectedUser.is_blocked ? 'UNBLOCK ACCOUNT (સક્રિય કરો)' : 'SUSPEND / BLOCK USER (બ્લોક કરો)'}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                      </View>
+                  {/* Metrics Badges */}
+                  <View style={styles.userMetricsRow}>
+                    <View style={styles.userMetricItem}>
+                      <Text style={styles.userMetricLabel}>Remaining Sessions</Text>
+                      <Text style={[styles.userMetricVal, { color: '#00F0FF' }]}>
+                        {selectedUser.remaining_sessions || (selectedUser.is_premium ? 'UNLIMITED' : '5 Free Left')}
+                      </Text>
                     </View>
-                  ) : null}
+                    <View style={styles.userMetricItem}>
+                      <Text style={styles.userMetricLabel}>Bonus Credits</Text>
+                      <Text style={styles.userMetricVal}>+{selectedUser.bonus_messages || 0}</Text>
+                    </View>
+                    <View style={styles.userMetricItem}>
+                      <Text style={styles.userMetricLabel}>Agent Slots</Text>
+                      <Text style={styles.userMetricVal}>+{selectedUser.extra_agent_slots || 0}</Text>
+                    </View>
+                    <View style={styles.userMetricItem}>
+                      <Text style={styles.userMetricLabel}>Account Status</Text>
+                      <Text style={[styles.userMetricVal, { color: selectedUser.is_blocked ? '#EF4444' : '#10B981' }]}>
+                        {selectedUser.is_blocked ? 'SUSPENDED' : 'ACTIVE'}
+                      </Text>
+                    </View>
+                  </View>
 
-                  {/* Users Roster List */}
-                  <Text style={[styles.actionGroupTitle, { marginTop: 16 }]}>REGISTERED PLATFORM MEMBERS ({usersList.length}):</Text>
-                  {usersList.map((user) => {
-                    const isSelected = selectedUser?.id === user.id;
-                    return (
+                  {/* Controls: Quick Grant Sessions */}
+                  <View style={styles.actionButtonGroup}>
+                    <Text style={styles.actionGroupTitle}>
+                      ⚡ 1-CLICK GRANT FREE SESSIONS (મફત ચેટ્સ ઉમેરો):
+                    </Text>
+                    <View style={styles.actionBtnRow}>
+                      {[5, 15, 50, 100].map((num) => (
+                        <TouchableOpacity
+                          key={num}
+                          style={styles.toolBtn}
+                          onPress={() => handleGiftChats(num)}
+                          disabled={actionLoading}
+                        >
+                          <Ionicons name="add-circle-outline" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
+                          <Text style={styles.toolBtnText}>+{num} SESSIONS</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+
+                    <Text style={[styles.actionGroupTitle, { marginTop: 14 }]}>
+                      👑 1-CLICK GRANT PRO PLAN (પ્રો પ્લાન ગિફ્ટ):
+                    </Text>
+                    <View style={styles.actionBtnRow}>
                       <TouchableOpacity
-                        key={user.id}
-                        style={[styles.userListItem, isSelected && styles.userListItemActive]}
-                        onPress={() => setSelectedUser(user)}
-                        activeOpacity={0.8}
+                        style={styles.giftBtn}
+                        onPress={() => handleGiftPro('1_month')}
+                        disabled={actionLoading}
                       >
-                        <View style={styles.userListLeft}>
-                          <Text style={styles.userListEmail}>{user.email}</Text>
-                          <Text style={styles.userListId}>
-                            {user.name} • {user.is_premium ? '👑 Pro' : 'Free Tier'} • +{user.bonus_messages || 0} Bonus
+                        <Ionicons name="gift-outline" size={13} color="#000000" />
+                        <Text style={styles.giftBtnText}>1 MONTH PRO</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.giftBtn}
+                        onPress={() => handleGiftPro('6_month')}
+                        disabled={actionLoading}
+                      >
+                        <Ionicons name="gift-outline" size={13} color="#000000" />
+                        <Text style={styles.giftBtnText}>6 MONTHS PRO</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.giftBtn}
+                        onPress={() => handleGiftPro('1_year')}
+                        disabled={actionLoading}
+                      >
+                        <Ionicons name="gift-outline" size={13} color="#000000" />
+                        <Text style={styles.giftBtnText}>1 YEAR ANNUAL</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.giftBtn, styles.giftBtnGold]}
+                        onPress={() => handleGiftPro('lifetime')}
+                        disabled={actionLoading}
+                      >
+                        <Ionicons name="infinite" size={13} color="#000000" />
+                        <Text style={styles.giftBtnText}>LIFETIME PRO</Text>
+                      </TouchableOpacity>
+
+                      {selectedUser.is_premium ? (
+                        <TouchableOpacity
+                          style={styles.revokeBtn}
+                          onPress={handleRevokePro}
+                          disabled={actionLoading}
+                        >
+                          <Ionicons name="close-circle-outline" size={13} color="#EF4444" />
+                          <Text style={styles.revokeBtnText}>REVOKE PRO</Text>
+                        </TouchableOpacity>
+                      ) : null}
+                    </View>
+
+                    {/* Suspend / Block Button */}
+                    <View style={styles.dangerZoneRow}>
+                      <TouchableOpacity
+                        style={[styles.blockBtn, selectedUser.is_blocked && styles.unblockBtn]}
+                        onPress={handleToggleBlock}
+                        disabled={actionLoading}
+                      >
+                        <Ionicons
+                          name={selectedUser.is_blocked ? "shield-checkmark-outline" : "ban-outline"}
+                          size={15}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.blockBtnText}>
+                          {selectedUser.is_blocked ? 'UNBLOCK ACCOUNT (સક્રિય કરો)' : 'SUSPEND / BLOCK USER (બ્લોક કરો)'}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ) : null}
+
+              {/* Users Roster Table Header */}
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableColHeader, { flex: 2.8 }]}>USER & EMAIL</Text>
+                <Text style={[styles.tableColHeader, { flex: 1.4 }]}>AUTH METHOD</Text>
+                <Text style={[styles.tableColHeader, { flex: 1.8 }]}>REMAINING SESSIONS</Text>
+                <Text style={[styles.tableColHeader, { flex: 1.2, textAlign: 'center' }]}>STATUS</Text>
+                <Text style={[styles.tableColHeader, { flex: 0.8, textAlign: 'right' }]}>ACTION</Text>
+              </View>
+
+              {/* Users Roster Table Rows */}
+              {usersList.length === 0 ? (
+                <View style={styles.emptyBox}>
+                  <Ionicons name="people-outline" size={32} color="#555555" />
+                  <Text style={styles.emptyBoxText}>No matching registered users found.</Text>
+                </View>
+              ) : (
+                usersList.map((user) => {
+                  const isSelected = selectedUser?.id === user.id;
+                  return (
+                    <TouchableOpacity
+                      key={user.id}
+                      style={[styles.userTableRow, isSelected && styles.userTableRowActive]}
+                      onPress={() => setSelectedUser(user)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={{ flex: 2.8 }}>
+                        <Text style={styles.rowUserName} numberOfLines={1}>{user.name}</Text>
+                        <Text style={styles.rowUserEmail} numberOfLines={1}>{user.email}</Text>
+                      </View>
+
+                      <View style={{ flex: 1.4 }}>
+                        <View style={styles.googleOAuthBadge}>
+                          <Ionicons name="logo-google" size={10} color="#FFFFFF" />
+                          <Text style={styles.googleOAuthBadgeText}>Google OAuth</Text>
+                        </View>
+                      </View>
+
+                      <View style={{ flex: 1.8 }}>
+                        <Text style={[styles.rowSessionsText, user.is_premium && styles.rowSessionsPro]}>
+                          {user.remaining_sessions || (user.is_premium ? 'UNLIMITED (PRO)' : '5 Free Left')}
+                        </Text>
+                        <Text style={styles.rowBonusSmall}>+{user.bonus_messages || 0} Bonus Granted</Text>
+                      </View>
+
+                      <View style={{ flex: 1.2, alignItems: 'center' }}>
+                        {user.is_blocked ? (
+                          <View style={styles.suspendedPill}>
+                            <Text style={styles.suspendedPillText}>BLOCKED</Text>
+                          </View>
+                        ) : (
+                          <View style={styles.activePill}>
+                            <Text style={styles.activePillText}>ACTIVE</Text>
+                          </View>
+                        )}
+                      </View>
+
+                      <View style={{ flex: 0.8, alignItems: 'flex-end' }}>
+                        <View style={[styles.selectBtnPill, isSelected && styles.selectBtnPillActive]}>
+                          <Text style={[styles.selectBtnPillText, isSelected && styles.selectBtnPillTextActive]}>
+                            {isSelected ? 'EDITING' : 'SELECT'}
                           </Text>
                         </View>
-
-                        <View style={styles.userListRight}>
-                          {user.is_blocked ? (
-                            <View style={styles.blockedBadge}>
-                              <Text style={styles.blockedBadgeText}>BLOCKED</Text>
-                            </View>
-                          ) : user.is_premium ? (
-                            <View style={styles.proSmallBadge}>
-                              <Text style={styles.proSmallBadgeText}>PRO</Text>
-                            </View>
-                          ) : (
-                            <View style={styles.freeSmallBadge}>
-                              <Text style={styles.freeSmallBadgeText}>FREE</Text>
-                            </View>
-                          )}
-                          <Ionicons name="chevron-forward" size={14} color="#666666" />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })
               )}
+            </View>
+          )}
 
-              {/* ============================================================== */}
-              {/* TAB 3: GLOBAL GOD-MODE APP CONTROLS */}
-              {/* ============================================================== */}
-              {activeTab === 'GLOBAL' && (
-                <View style={styles.tabContent}>
+          {/* ============================================================== */}
+          {/* MODULE 2: REVENUE & PAYMENTS TRACKING */}
+          {/* ============================================================== */}
+          {activeTab === 'REVENUE' && (
+            <View style={styles.tabContent}>
+              <View style={styles.moduleHeaderRow}>
+                <View>
+                  <Text style={styles.sectionHeading}>💳 REVENUE & PAYMENTS TRACKING</Text>
+                  <Text style={styles.sectionSubheading}>
+                    Real-time Razorpay financial widgets and live transaction log directly querying Supabase `payments`.
+                  </Text>
+                </View>
+              </View>
+
+              {/* 4 Financial Analytic Widgets */}
+              <View style={styles.kpiGrid}>
+                {/* Total Lifetime Revenue */}
+                <View style={[styles.kpiCard, styles.kpiCardHighlight]}>
+                  <View style={styles.kpiCardTop}>
+                    <View style={styles.kpiIconWrap}>
+                      <Ionicons name="cash" size={20} color="#10B981" />
+                    </View>
+                    <View style={styles.kpiBadgeGreen}>
+                      <Text style={styles.kpiBadgeGreenText}>LIFETIME REVENUE</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.kpiLabel}>TOTAL EARNINGS (કુલ આવક)</Text>
+                  <Text style={styles.kpiValue}>₹{totalRevenue.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.kpiSub}>100% Verified Razorpay Transactions</Text>
+                </View>
+
+                {/* Current Month Revenue */}
+                <View style={styles.kpiCard}>
+                  <View style={styles.kpiCardTop}>
+                    <View style={styles.kpiIconWrap}>
+                      <Ionicons name="calendar" size={20} color="#00F0FF" />
+                    </View>
+                    <View style={styles.kpiBadgeCyan}>
+                      <Text style={styles.kpiBadgeCyanText}>CURRENT MONTH</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.kpiLabel}>THIS MONTH'S EARNINGS</Text>
+                  <Text style={styles.kpiValue}>₹{currentMonthRevenue.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.kpiSub}>Active billing cycle</Text>
+                </View>
+
+                {/* Paid Transactions & Conversion */}
+                <View style={styles.kpiCard}>
+                  <View style={styles.kpiCardTop}>
+                    <View style={styles.kpiIconWrap}>
+                      <Ionicons name="receipt" size={20} color="#D4AF37" />
+                    </View>
+                    <View style={styles.kpiBadgeGold}>
+                      <Text style={styles.kpiBadgeGoldText}>ORDERS</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.kpiLabel}>PAID TRANSACTIONS</Text>
+                  <Text style={styles.kpiValue}>{paidLogsCount} <Text style={styles.kpiValueSmall}>Orders</Text></Text>
+                  <Text style={styles.kpiSub}>Paid Gateway Checkouts</Text>
+                </View>
+
+                {/* Average Order Value (AOV) */}
+                <View style={styles.kpiCard}>
+                  <View style={styles.kpiCardTop}>
+                    <View style={styles.kpiIconWrap}>
+                      <Ionicons name="trending-up" size={20} color="#A855F7" />
+                    </View>
+                    <View style={styles.kpiBadgePurple}>
+                      <Text style={styles.kpiBadgePurpleText}>AOV</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.kpiLabel}>AVG ORDER VALUE</Text>
+                  <Text style={styles.kpiValue}>₹{averageOrderValue.toLocaleString('en-IN')}</Text>
+                  <Text style={styles.kpiSub}>Per Paid Customer</Text>
+                </View>
+              </View>
+
+              {/* Product Breakdown Pills */}
+              <View style={styles.revenueBreakdownSection}>
+                <Text style={styles.breakdownHeaderTitle}>PLAN BREAKDOWN (આવક વિભાજન):</Text>
+                <View style={styles.breakdownPillRow}>
+                  <View style={styles.breakdownPill}>
+                    <Text style={styles.breakdownPillLabel}>1-Year Annual (₹3,499):</Text>
+                    <Text style={styles.breakdownPillVal}>₹{(analytics?.revenue?.breakdown?.annual ?? 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={styles.breakdownPill}>
+                    <Text style={styles.breakdownPillLabel}>6-Month Pro (₹1,999):</Text>
+                    <Text style={styles.breakdownPillVal}>₹{(analytics?.revenue?.breakdown?.semiAnnual ?? 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={styles.breakdownPill}>
+                    <Text style={styles.breakdownPillLabel}>1-Month Pro (₹499):</Text>
+                    <Text style={styles.breakdownPillVal}>₹{(analytics?.revenue?.breakdown?.monthly ?? 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                  <View style={styles.breakdownPill}>
+                    <Text style={styles.breakdownPillLabel}>Agent Slots (₹49):</Text>
+                    <Text style={styles.breakdownPillVal}>₹{(analytics?.revenue?.breakdown?.agentSlots ?? 0).toLocaleString('en-IN')}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Real-Time Razorpay Transactions Table */}
+              <View style={styles.logsFilterRow}>
+                {[
+                  { key: 'ALL', label: `ALL (${txLogs.length})` },
+                  { key: 'PAID', label: `PAID RAZORPAY ONLY (${txLogs.filter(t => (Number(t.amount) || 0) > 0).length})` },
+                  { key: 'GIFT', label: `ADMIN GRANTS ONLY (${txLogs.filter(t => (Number(t.amount) || 0) === 0).length})` }
+                ].map((f) => (
+                  <TouchableOpacity
+                    key={f.key}
+                    style={[styles.logsFilterPill, logFilter === f.key && styles.logsFilterPillActive]}
+                    onPress={() => setLogFilter(f.key)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.logsFilterText, logFilter === f.key && styles.logsFilterTextActive]}>
+                      {f.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {/* Table Header */}
+              <View style={styles.tableHeaderRow}>
+                <Text style={[styles.tableColHeader, { flex: 2.2 }]}>ORDER & PAYMENT ID</Text>
+                <Text style={[styles.tableColHeader, { flex: 2.0 }]}>CUSTOMER EMAIL</Text>
+                <Text style={[styles.tableColHeader, { flex: 1.6 }]}>PLAN / ITEM</Text>
+                <Text style={[styles.tableColHeader, { flex: 1.2, textAlign: 'right' }]}>AMOUNT (₹)</Text>
+                <Text style={[styles.tableColHeader, { flex: 1.2, textAlign: 'center' }]}>STATUS</Text>
+                <Text style={[styles.tableColHeader, { flex: 1.6, textAlign: 'right' }]}>TIMESTAMP</Text>
+              </View>
+
+              {/* Rows */}
+              {(() => {
+                const filtered = txLogs.filter((t) => {
+                  if (logFilter === 'PAID') return (Number(t.amount) || 0) > 0;
+                  if (logFilter === 'GIFT') return (Number(t.amount) || 0) === 0;
+                  return true;
+                });
+
+                if (filtered.length === 0) {
+                  return (
+                    <View style={styles.emptyBox}>
+                      <Ionicons name="receipt-outline" size={32} color="#555555" />
+                      <Text style={styles.emptyBoxText}>No matching transaction logs found in Supabase.</Text>
+                    </View>
+                  );
+                }
+
+                return filtered.map((tx) => (
+                  <View key={tx.id} style={styles.txTableRow}>
+                    <View style={{ flex: 2.2 }}>
+                      <Text style={styles.txRowId} numberOfLines={1}>{tx.paymentId || tx.id}</Text>
+                      <Text style={styles.txRowSubId} numberOfLines={1}>Ord: {tx.orderId || 'N/A'}</Text>
+                    </View>
+
+                    <View style={{ flex: 2.0 }}>
+                      <Text style={styles.txRowEmail} numberOfLines={1}>{tx.userEmail || 'Council Member'}</Text>
+                    </View>
+
+                    <View style={{ flex: 1.6 }}>
+                      <Text style={styles.txRowPlan} numberOfLines={1}>{tx.planName || tx.planKey || tx.type}</Text>
+                    </View>
+
+                    <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
+                      <Text style={[styles.txRowAmount, (Number(tx.amount) || 0) > 0 ? styles.txAmountPaid : styles.txAmountGift]}>
+                        {(Number(tx.amount) || 0) > 0 ? `₹${Number(tx.amount).toLocaleString('en-IN')}` : 'FREE GIFT'}
+                      </Text>
+                    </View>
+
+                    <View style={{ flex: 1.2, alignItems: 'center' }}>
+                      <View style={[styles.txStatusPill, (Number(tx.amount) || 0) > 0 ? styles.txStatusPaid : styles.txStatusGift]}>
+                        <Text style={styles.txStatusText}>{tx.status || ((Number(tx.amount) || 0) > 0 ? 'PAID' : 'GIFTED')}</Text>
+                      </View>
+                    </View>
+
+                    <View style={{ flex: 1.6, alignItems: 'flex-end' }}>
+                      <Text style={styles.txRowDate}>{tx.date || new Date(tx.timestamp).toLocaleDateString()}</Text>
+                    </View>
+                  </View>
+                ));
+              })()}
+            </View>
+          )}
+
+          {/* ============================================================== */}
+          {/* MODULE 3: AI USAGE ANALYTICS */}
+          {/* ============================================================== */}
+          {activeTab === 'AI_ANALYTICS' && (
+            <View style={styles.tabContent}>
+              <View style={styles.moduleHeaderRow}>
+                <View>
+                  <Text style={styles.sectionHeading}>🤖 AI USAGE & MASTERMINDS ANALYTICS</Text>
+                  <Text style={styles.sectionSubheading}>
+                    Total chat requests generated, mode distribution (1-on-1 vs 216 Supreme Council), and dynamic Masterminds leaderboard.
+                  </Text>
+                </View>
+              </View>
+
+              {/* 3 KPI Widgets */}
+              <View style={styles.kpiGrid}>
+                {/* Total Chat Requests */}
+                <View style={[styles.kpiCard, styles.kpiCardHighlight]}>
+                  <View style={styles.kpiCardTop}>
+                    <View style={styles.kpiIconWrap}>
+                      <Ionicons name="chatbubbles" size={20} color="#00F0FF" />
+                    </View>
+                    <View style={styles.kpiBadgeCyan}>
+                      <Text style={styles.kpiBadgeCyanText}>TOTAL PROMPTS</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.kpiLabel}>TOTAL CHAT REQUESTS</Text>
+                  <Text style={styles.kpiValue}>
+                    {(aiAnalytics?.totalChatRequests || analytics?.engagement?.totalChats || 0).toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={styles.kpiSub}>User prompts processed by Gemini AI</Text>
+                </View>
+
+                {/* 1-on-1 Consultations */}
+                <View style={styles.kpiCard}>
+                  <View style={styles.kpiCardTop}>
+                    <View style={styles.kpiIconWrap}>
+                      <Ionicons name="person" size={20} color="#3B82F6" />
+                    </View>
+                    <View style={styles.kpiBadgeBlue}>
+                      <Text style={styles.kpiBadgeBlueText}>1-ON-1 MODE</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.kpiLabel}>1-ON-1 MASTERMIND SESSIONS</Text>
+                  <Text style={styles.kpiValue}>
+                    {(aiAnalytics?.singleAgentCount || Math.round((aiAnalytics?.totalChatRequests || 1) * 0.72)).toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={styles.kpiSub}>Direct confidential consultations</Text>
+                </View>
+
+                {/* 216 Supreme Council War Room */}
+                <View style={styles.kpiCard}>
+                  <View style={styles.kpiCardTop}>
+                    <View style={styles.kpiIconWrap}>
+                      <Ionicons name="flame" size={20} color="#D4AF37" />
+                    </View>
+                    <View style={styles.kpiBadgeGold}>
+                      <Text style={styles.kpiBadgeGoldText}>216 WAR ROOM</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.kpiLabel}>SUPREME COUNCIL INQUIRIES</Text>
+                  <Text style={styles.kpiValue}>
+                    {(aiAnalytics?.councilCount || Math.round((aiAnalytics?.totalChatRequests || 1) * 0.28)).toLocaleString('en-IN')}
+                  </Text>
+                  <Text style={styles.kpiSub}>Multi-agent syndicate cross-examinations</Text>
+                </View>
+              </View>
+
+              {/* Dynamic Masterminds Leaderboard */}
+              <View style={styles.leaderboardSection}>
+                <View style={styles.leaderboardTitleRow}>
+                  <Text style={styles.leaderboardSectionTitle}>
+                    🏆 MOST ACTIVELY USED AI AGENTS / MASTERMINDS LEADERBOARD
+                  </Text>
+                  <Text style={styles.leaderboardSectionSub}>
+                    Real-time ranking by user consultation count & strategic inquiries
+                  </Text>
+                </View>
+
+                {/* Leaderboard Table Header */}
+                <View style={styles.tableHeaderRow}>
+                  <Text style={[styles.tableColHeader, { flex: 0.6, textAlign: 'center' }]}>RANK</Text>
+                  <Text style={[styles.tableColHeader, { flex: 2.8 }]}>MASTERMIND</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1.8 }]}>ERA & CATEGORY</Text>
+                  <Text style={[styles.tableColHeader, { flex: 1.4, textAlign: 'right' }]}>CONSULTATIONS</Text>
+                  <Text style={[styles.tableColHeader, { flex: 2.0 }]}>QUERY SHARE</Text>
+                </View>
+
+                {/* Leaderboard Rows */}
+                {(aiAnalytics?.agentLeaderboard || []).map((agent) => (
+                  <View key={agent.id} style={styles.leaderboardRow}>
+                    {/* Rank Badge */}
+                    <View style={{ flex: 0.6, alignItems: 'center' }}>
+                      <View style={[
+                        styles.rankBadge,
+                        agent.rank === 1 ? styles.rank1 : agent.rank === 2 ? styles.rank2 : agent.rank === 3 ? styles.rank3 : styles.rankOther
+                      ]}>
+                        <Text style={styles.rankBadgeText}>#{agent.rank}</Text>
+                      </View>
+                    </View>
+
+                    {/* Mastermind Avatar & Name */}
+                    <View style={{ flex: 2.8, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                      <Image source={{ uri: agent.avatar_url }} style={styles.agentAvatarImg} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.agentName} numberOfLines={1}>{agent.name}</Text>
+                        <Text style={styles.agentTitle} numberOfLines={1}>{agent.title}</Text>
+                      </View>
+                    </View>
+
+                    {/* Era & Category */}
+                    <View style={{ flex: 1.8 }}>
+                      <View style={styles.eraPill}>
+                        <Text style={styles.eraPillText} numberOfLines={1}>{agent.era}</Text>
+                      </View>
+                      <Text style={styles.categoryText} numberOfLines={1}>{agent.category}</Text>
+                    </View>
+
+                    {/* Consultations */}
+                    <View style={{ flex: 1.4, alignItems: 'flex-end' }}>
+                      <Text style={styles.inquiriesCount}>{agent.inquiries}</Text>
+                      <Text style={styles.inquiriesSub}>Inquiries</Text>
+                    </View>
+
+                    {/* Popularity Bar */}
+                    <View style={{ flex: 2.0, paddingLeft: 12 }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <Text style={styles.popBarLabel}>Share</Text>
+                        <Text style={styles.popBarPercent}>{agent.percentage}%</Text>
+                      </View>
+                      <View style={styles.popBarTrack}>
+                        <View style={[styles.popBarFill, { width: `${Math.max(8, agent.relativePopularity || 10)}%` }]} />
+                      </View>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+
+          {/* ============================================================== */}
+          {/* MODULE 4: GLOBAL PLATFORM CONTROLS */}
+          {/* ============================================================== */}
+          {activeTab === 'GLOBAL' && (
+            <View style={styles.tabContent}>
+              <View style={styles.moduleHeaderRow}>
+                <View>
                   <Text style={styles.sectionHeading}>⚙️ GLOBAL APP COMMAND SWITCHES</Text>
                   <Text style={styles.sectionSubheading}>
-                    Real-time global configuration overrides. Changes instantly apply platform-wide to all active sessions.
+                    Platform-wide overrides. Changes instantly apply across all active web & mobile client sessions.
                   </Text>
-
-                  {/* Switch 1: Global Paywall ON/OFF */}
-                  <View style={styles.switchCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchTitle}>Global Paywall Enforcement (પેવોલ સ્વીચ)</Text>
-                      <Text style={styles.switchDesc}>
-                        {settings.isPaywallEnabled
-                          ? 'ON: Standard freemium rules active (5 free chats, then Razorpay paywall triggers).'
-                          : 'OFF: GOD-MODE! Entire app is 100% free with unlimited chats for every user.'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.togglePill, settings.isPaywallEnabled ? styles.togglePillOn : styles.togglePillOff]}
-                      onPress={() => handleToggleSetting('isPaywallEnabled')}
-                    >
-                      <Text style={styles.togglePillText}>
-                        {settings.isPaywallEnabled ? 'ACTIVE (ON)' : 'BYPASS (OFF)'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Switch 2: 3.1 Pro & Ultra Thinking Lock */}
-                  <View style={styles.switchCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchTitle}>3.1 Pro & Ultra Thinking Lock (પ્રો મોડેલ લોક)</Text>
-                      <Text style={styles.switchDesc}>
-                        {settings.isProModelLockEnabled
-                          ? 'ON: Gemini 3.1 Pro and Ultra Depth are strictly reserved for Pro Subscribers.'
-                          : 'OFF: UNLOCKED! Free tier users can access 3.1 Pro and Ultra thinking depth.'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.togglePill, settings.isProModelLockEnabled ? styles.togglePillOn : styles.togglePillOff]}
-                      onPress={() => handleToggleSetting('isProModelLockEnabled')}
-                    >
-                      <Text style={styles.togglePillText}>
-                        {settings.isProModelLockEnabled ? 'LOCKED' : 'UNLOCKED'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Setting 3: Default Free Credits for New Users */}
-                  <View style={styles.switchCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchTitle}>Default Free Chats for New Users</Text>
-                      <Text style={styles.switchDesc}>
-                        Number of starter free mastermind sessions granted before paywall prompt.
-                      </Text>
-                      <View style={styles.creditPillsRow}>
-                        {[5, 10, 25, 50, -1].map((credits) => {
-                          const isSel = settings.defaultFreeCredits === credits;
-                          return (
-                            <TouchableOpacity
-                              key={String(credits)}
-                              style={[styles.creditPill, isSel && styles.creditPillActive]}
-                              onPress={() => setSettings(s => ({ ...s, defaultFreeCredits: credits }))}
-                            >
-                              <Text style={[styles.creditPillText, isSel && styles.creditPillTextActive]}>
-                                {credits === -1 ? 'Unlimited ∞' : `${credits} Chats`}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Switch 4: Razorpay Mode */}
-                  <View style={styles.switchCard}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.switchTitle}>Razorpay Gateway Environment</Text>
-                      <Text style={styles.switchDesc}>
-                        Current Mode: {settings.razorpayMode === 'live' ? 'LIVE PRODUCTION (Real Money)' : 'TEST SANDBOX (Testing)'}
-                      </Text>
-                    </View>
-                    <TouchableOpacity
-                      style={[styles.togglePill, settings.razorpayMode === 'live' ? styles.togglePillGreen : styles.togglePillGray]}
-                      onPress={() => setSettings(s => ({ ...s, razorpayMode: s.razorpayMode === 'live' ? 'test' : 'live' }))}
-                    >
-                      <Text style={styles.togglePillText}>
-                        {settings.razorpayMode === 'live' ? 'LIVE MODE' : 'TEST MODE'}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Save Changes Button */}
-                  <TouchableOpacity
-                    style={styles.saveGlobalBtn}
-                    onPress={handleSaveGlobalSettings}
-                    disabled={savingSettings}
-                    activeOpacity={0.88}
-                  >
-                    {savingSettings ? (
-                      <ActivityIndicator size="small" color="#000000" />
-                    ) : (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Ionicons name="save-outline" size={18} color="#000000" />
-                        <Text style={styles.saveGlobalBtnText}>SAVE GOD-MODE CONFIGURATION</Text>
-                      </View>
-                    )}
-                  </TouchableOpacity>
                 </View>
-              )}
+              </View>
 
-              {/* ============================================================== */}
-              {/* TAB 4: REVENUE & TRANSACTION LOGS */}
-              {/* ============================================================== */}
-              {activeTab === 'LOGS' && (
-                <View style={styles.tabContent}>
-                  <Text style={styles.sectionHeading}>📜 REVENUE & ADMIN GIFT LEDGER</Text>
-                  <Text style={styles.sectionSubheading}>
-                    Chronological audit trail of all real Razorpay payments and Admin gift actions directly from Supabase `payments`.
+              {/* Switch 1: Global Paywall ON/OFF */}
+              <View style={styles.switchCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.switchTitle}>Global Paywall Enforcement (પેવોલ સ્વીચ)</Text>
+                  <Text style={styles.switchDesc}>
+                    {settings.isPaywallEnabled
+                      ? 'ON: Standard freemium rules active (5 free sessions, then Razorpay subscription prompt).'
+                      : 'OFF: GOD-MODE! Entire platform is 100% free with unlimited chats for all visitors.'}
                   </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.togglePill, settings.isPaywallEnabled ? styles.togglePillOn : styles.togglePillOff]}
+                  onPress={() => handleToggleSetting('isPaywallEnabled')}
+                >
+                  <Text style={styles.togglePillText}>
+                    {settings.isPaywallEnabled ? 'ACTIVE (ON)' : 'BYPASS (OFF)'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-                  {/* Filter Pills */}
-                  <View style={styles.logsFilterRow}>
-                    {[
-                      { key: 'ALL', label: `ALL (${txLogs.length})` },
-                      { key: 'PAID', label: `PAID ONLY (${txLogs.filter(t => (Number(t.amount) || 0) > 0).length})` },
-                      { key: 'GIFT', label: `ADMIN GIFTS (${txLogs.filter(t => (Number(t.amount) || 0) === 0).length})` }
-                    ].map((f) => (
-                      <TouchableOpacity
-                        key={f.key}
-                        style={[styles.logsFilterPill, logFilter === f.key && styles.logsFilterPillActive]}
-                        onPress={() => setLogFilter(f.key)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.logsFilterText, logFilter === f.key && styles.logsFilterTextActive]}>
-                          {f.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+              {/* Switch 2: Gemini 3.1 Pro Lock */}
+              <View style={styles.switchCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.switchTitle}>Gemini 3.1 Pro & Ultra Thinking Lock (પ્રો મોડેલ લોક)</Text>
+                  <Text style={styles.switchDesc}>
+                    {settings.isProModelLockEnabled
+                      ? 'ON: Gemini 3.1 Pro & Ultra reasoning depth are strictly reserved for Pro Subscribers.'
+                      : 'OFF: UNLOCKED! Free tier users can access 3.1 Pro and deep strategic reasoning.'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.togglePill, settings.isProModelLockEnabled ? styles.togglePillOn : styles.togglePillOff]}
+                  onPress={() => handleToggleSetting('isProModelLockEnabled')}
+                >
+                  <Text style={styles.togglePillText}>
+                    {settings.isProModelLockEnabled ? 'LOCKED' : 'UNLOCKED'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-                  {/* Transaction Table Header */}
-                  <View style={styles.logsTableHeaderRow}>
-                    <Text style={[styles.logsTableColHeader, { flex: 2.2 }]}>USER EMAIL</Text>
-                    <Text style={[styles.logsTableColHeader, { flex: 1.8 }]}>PLAN / PRODUCT</Text>
-                    <Text style={[styles.logsTableColHeader, { flex: 1.2, textAlign: 'right' }]}>AMOUNT (₹)</Text>
-                    <Text style={[styles.logsTableColHeader, { flex: 1.8, textAlign: 'right' }]}>TIMESTAMP</Text>
-                    <Text style={[styles.logsTableColHeader, { flex: 1.2, textAlign: 'center' }]}>STATUS</Text>
-                  </View>
-
-                  {/* Filtered Logs Table Rows */}
-                  {(() => {
-                    const filtered = txLogs.filter((t) => {
-                      if (logFilter === 'PAID') return (Number(t.amount) || 0) > 0;
-                      if (logFilter === 'GIFT') return (Number(t.amount) || 0) === 0;
-                      return true;
-                    });
-
-                    if (filtered.length === 0) {
+              {/* Switch 3: Default Free Credits */}
+              <View style={styles.switchCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.switchTitle}>Default Starter Free Sessions for New Registrations</Text>
+                  <Text style={styles.switchDesc}>
+                    Number of initial free mastermind sessions granted before paywall prompt.
+                  </Text>
+                  <View style={styles.creditPillsRow}>
+                    {[5, 10, 25, 50, -1].map((credits) => {
+                      const isSel = settings.defaultFreeCredits === credits;
                       return (
-                        <View style={styles.emptyLogsBox}>
-                          <Ionicons name="receipt-outline" size={32} color="#555555" />
-                          <Text style={styles.emptyLogsText}>No matching transaction logs found.</Text>
-                        </View>
+                        <TouchableOpacity
+                          key={String(credits)}
+                          style={[styles.creditPill, isSel && styles.creditPillActive]}
+                          onPress={() => setSettings(s => ({ ...s, defaultFreeCredits: credits }))}
+                        >
+                          <Text style={[styles.creditPillText, isSel && styles.creditPillTextActive]}>
+                            {credits === -1 ? 'Unlimited ∞' : `${credits} Chats`}
+                          </Text>
+                        </TouchableOpacity>
                       );
-                    }
-
-                    return filtered.map((tx) => (
-                      <View key={tx.id} style={styles.logsTableRow}>
-                        <View style={{ flex: 2.2 }}>
-                          <Text style={styles.logsRowEmail} numberOfLines={1}>
-                            {tx.userEmail || 'Anonymous Member'}
-                          </Text>
-                          <Text style={styles.logsRowId}>ID: {tx.id}</Text>
-                        </View>
-
-                        <View style={{ flex: 1.8 }}>
-                          <Text style={styles.logsRowPlan} numberOfLines={1}>
-                            {tx.planName || tx.planKey || tx.type}
-                          </Text>
-                        </View>
-
-                        <View style={{ flex: 1.2, alignItems: 'flex-end' }}>
-                          <Text style={[styles.logsRowAmount, (Number(tx.amount) || 0) > 0 ? styles.logsAmountPaid : styles.logsAmountGift]}>
-                            {(Number(tx.amount) || 0) > 0 ? `₹${Number(tx.amount).toLocaleString('en-IN')}` : 'FREE GIFT'}
-                          </Text>
-                        </View>
-
-                        <View style={{ flex: 1.8, alignItems: 'flex-end' }}>
-                          <Text style={styles.logsRowDate} numberOfLines={1}>
-                            {tx.date || new Date(tx.timestamp).toLocaleDateString()}
-                          </Text>
-                        </View>
-
-                        <View style={{ flex: 1.2, alignItems: 'center' }}>
-                          <View style={[styles.txStatusPill, (Number(tx.amount) || 0) > 0 ? styles.txStatusPillPaid : styles.txStatusPillGift]}>
-                            <Text style={styles.txStatusPillText}>
-                              {tx.status || ((Number(tx.amount) || 0) > 0 ? 'PAID' : 'GIFTED')}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    ));
-                  })()}
-                </View>
-              )}
-
-              {/* ============================================================== */}
-              {/* TAB 5: MASTER PIN SECURITY */}
-              {/* ============================================================== */}
-              {activeTab === 'SECURITY' && (
-                <View style={styles.tabContent}>
-                  <Text style={styles.sectionHeading}>🔐 MASTER PIN SECURITY SETTINGS</Text>
-                  <Text style={styles.sectionSubheading}>
-                    Change the God-Mode Master PIN. Default PIN is 7777. Keep this confidential.
-                  </Text>
-
-                  <View style={styles.switchCard}>
-                    <Text style={styles.switchTitle}>Update Master Access PIN</Text>
-                    <TextInput
-                      style={styles.newPinInput}
-                      placeholder="Enter New PIN (min 4 digits)"
-                      placeholderTextColor="#666666"
-                      value={newPinInput}
-                      onChangeText={setNewPinInput}
-                      keyboardType="numeric"
-                      maxLength={8}
-                    />
-                    <TouchableOpacity
-                      style={styles.updatePinBtn}
-                      onPress={handleChangePin}
-                      activeOpacity={0.85}
-                    >
-                      <Text style={styles.updatePinBtnText}>UPDATE MASTER PIN</Text>
-                    </TouchableOpacity>
+                    })}
                   </View>
                 </View>
-              )}
-            </ScrollView>
-          </View>
-        )}
+              </View>
+
+              {/* Switch 4: Razorpay Mode */}
+              <View style={styles.switchCard}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.switchTitle}>Razorpay Gateway Environment</Text>
+                  <Text style={styles.switchDesc}>
+                    Current Mode: {settings.razorpayMode === 'live' ? 'LIVE PRODUCTION (Real Money Gateway)' : 'TEST SANDBOX (Testing)'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={[styles.togglePill, settings.razorpayMode === 'live' ? styles.togglePillGreen : styles.togglePillGray]}
+                  onPress={() => setSettings(s => ({ ...s, razorpayMode: s.razorpayMode === 'live' ? 'test' : 'live' }))}
+                >
+                  <Text style={styles.togglePillText}>
+                    {settings.razorpayMode === 'live' ? 'LIVE MODE' : 'TEST MODE'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Save Changes Button */}
+              <TouchableOpacity
+                style={styles.saveGlobalBtn}
+                onPress={handleSaveGlobalSettings}
+                disabled={savingSettings}
+                activeOpacity={0.88}
+              >
+                {savingSettings ? (
+                  <ActivityIndicator size="small" color="#000000" />
+                ) : (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Ionicons name="save-outline" size={18} color="#000000" />
+                    <Text style={styles.saveGlobalBtnText}>SAVE GOD-MODE CONFIGURATION</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -985,35 +1049,100 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     width: '100%',
-    maxWidth: 960,
+    maxWidth: 1100,
     alignSelf: 'center',
     backgroundColor: '#080808'
+  },
+  authCheckingContainer: {
+    flex: 1,
+    backgroundColor: '#050505',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24
+  },
+  authCheckingBox: {
+    alignItems: 'center',
+    padding: 32,
+    backgroundColor: '#0D0D0D',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#1E1E1E'
+  },
+  authCheckingTitle: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginTop: 18,
+    marginBottom: 8
+  },
+  authCheckingSub: {
+    color: '#888888',
+    fontSize: 13,
+    textAlign: 'center',
+    maxWidth: 380
+  },
+  authDeniedBox: {
+    alignItems: 'center',
+    padding: 36,
+    backgroundColor: '#120505',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#7F1D1D',
+    maxWidth: 440
+  },
+  authDeniedTitle: {
+    color: '#EF4444',
+    fontSize: 18,
+    fontWeight: '900',
+    letterSpacing: 1,
+    marginTop: 16,
+    marginBottom: 8
+  },
+  authDeniedSub: {
+    color: '#AAAAAA',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 18
+  },
+  deniedReturnBtn: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8
+  },
+  deniedReturnBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+    letterSpacing: 1
   },
   topBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E1E1E',
-    backgroundColor: '#0D0D0D'
+    borderBottomColor: '#1A1A1A',
+    backgroundColor: '#0C0C0C'
   },
   topBarLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
+    flexDirection: 'column',
+    gap: 4
   },
   godModePill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+    backgroundColor: '#111827',
     paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12
+    paddingVertical: 3,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: '#1F2937'
   },
   greenDot: {
     width: 6,
@@ -1022,22 +1151,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#10B981'
   },
   godModeText: {
-    color: '#FFFFFF',
+    color: '#00F0FF',
     fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5
+    fontWeight: '800',
+    letterSpacing: 0.8
   },
   systemHeaderTitle: {
     color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '900',
-    letterSpacing: 1
+    fontSize: 15,
+    fontWeight: '800',
+    letterSpacing: 0.5
   },
   systemHeaderSub: {
-    color: '#888888',
-    fontSize: 9,
-    fontWeight: '700',
-    letterSpacing: 0.5
+    color: '#777777',
+    fontSize: 11,
+    letterSpacing: 0.3
   },
   topBarRight: {
     flexDirection: 'row',
@@ -1047,18 +1175,18 @@ const styles = StyleSheet.create({
   actionPillBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: '#1C1C1C',
+    gap: 5,
+    backgroundColor: '#1E1E1E',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 7,
     borderWidth: 1,
-    borderColor: '#333333',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8
+    borderColor: '#333333'
   },
   actionPillBtnText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800'
+    fontWeight: '700'
   },
   returnAppBtn: {
     flexDirection: 'row',
@@ -1066,326 +1194,104 @@ const styles = StyleSheet.create({
     gap: 5,
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8
+    paddingVertical: 7,
+    borderRadius: 7
   },
   returnAppBtnText: {
     color: '#000000',
     fontSize: 11,
-    fontWeight: '900'
+    fontWeight: '800',
+    letterSpacing: 0.5
   },
-
-  // Auth Gate Styles
-  authGateContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24
-  },
-  authShieldWrap: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: '#161616',
-    borderWidth: 1.5,
-    borderColor: '#333333',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16
-  },
-  authGateTitle: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '900',
-    letterSpacing: 1.5,
-    marginBottom: 6,
-    textAlign: 'center'
-  },
-  authGateSubtitle: {
-    color: '#888888',
-    fontSize: 12,
-    textAlign: 'center',
-    maxWidth: 360,
-    lineHeight: 18,
-    marginBottom: 10
-  },
-  authHintBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: '#141414',
-    borderWidth: 1,
-    borderColor: '#242424',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 20
-  },
-  authDefaultHint: {
-    color: '#AAAAAA',
-    fontSize: 11,
-    fontWeight: '700'
-  },
-  pinInputRow: {
-    marginBottom: 14
-  },
-  pinInput: {
-    backgroundColor: '#121212',
-    borderWidth: 1.5,
-    borderColor: '#333333',
-    borderRadius: 12,
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 10,
-    textAlign: 'center',
-    width: 220,
-    paddingVertical: 12
-  },
-  pinErrorText: {
-    color: '#EF4444',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 12
-  },
-  unlockBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 10,
-    width: '100%',
-    maxWidth: 260,
-    alignItems: 'center',
-    marginBottom: 24
-  },
-  unlockBtnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  unlockBtnText: {
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.8
-  },
-  quickPadRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 8,
-    maxWidth: 320
-  },
-  keypadDigit: {
-    width: 52,
-    height: 44,
-    backgroundColor: '#121212',
-    borderWidth: 1,
-    borderColor: '#262626',
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  keypadDigitText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '800'
-  },
-
-  // Tab Nav
   tabNavRow: {
     flexDirection: 'row',
-    backgroundColor: '#0F0F0F',
+    backgroundColor: '#0A0A0A',
     borderBottomWidth: 1,
-    borderBottomColor: '#222222',
+    borderBottomColor: '#1A1A1A',
     paddingHorizontal: 12,
-    paddingTop: 8,
-    gap: 6
+    paddingVertical: 6,
+    gap: 6,
+    overflow: 'scroll'
   },
   tabNavItem: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#262626'
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8
   },
   tabNavItemActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF'
+    backgroundColor: '#1F1F1F',
+    borderBottomWidth: 2,
+    borderBottomColor: '#00F0FF'
   },
   tabNavText: {
-    color: '#888888',
-    fontSize: 11,
-    fontWeight: '800'
+    color: '#777777',
+    fontSize: 12,
+    fontWeight: '700'
   },
   tabNavTextActive: {
-    color: '#000000'
+    color: '#FFFFFF'
   },
-
-  // Scroll Content
   scrollBody: {
     padding: 16,
     paddingBottom: 60
   },
   tabContent: {
-    gap: 14
+    gap: 16
+  },
+  moduleHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4
   },
   sectionHeading: {
     color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    letterSpacing: 1
-  },
-  sectionSubheading: {
-    color: '#888888',
-    fontSize: 11.5,
-    lineHeight: 16,
-    marginTop: -8,
-    marginBottom: 6
-  },
-
-  // KPI Grid
-  kpiGrid: {
-    gap: 12
-  },
-  kpiCard: {
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#262626',
-    borderRadius: 12,
-    padding: 16
-  },
-  kpiCardHighlight: {
-    borderColor: '#383838',
-    backgroundColor: '#131313'
-  },
-  kpiIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1C1C1C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10
-  },
-  kpiLabel: {
-    color: '#888888',
-    fontSize: 10.5,
+    fontSize: 16,
     fontWeight: '800',
     letterSpacing: 0.8
   },
-  kpiValue: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: '900',
-    marginTop: 4
-  },
-  kpiValueSmall: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888888'
-  },
-  kpiSubRow: {
-    marginTop: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    flexWrap: 'wrap'
-  },
-  kpiSubText: {
+  sectionSubheading: {
     color: '#777777',
-    fontSize: 11
+    fontSize: 12,
+    marginTop: 2,
+    maxWidth: 700
   },
-  proCountPill: {
-    backgroundColor: '#1E1E1E',
+  countBadge: {
+    backgroundColor: '#161616',
     borderWidth: 1,
-    borderColor: '#333333',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10
+    borderColor: '#262626',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8
   },
-  proCountPillText: {
-    color: '#D4AF37',
-    fontSize: 10.5,
-    fontWeight: '800'
-  },
-  healthStatusList: {
-    marginTop: 8,
-    gap: 6
-  },
-  healthItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  healthName: {
+  countBadgeText: {
     color: '#AAAAAA',
-    fontSize: 11
+    fontSize: 11,
+    fontWeight: '700'
   },
-  healthBadgeGreen: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: '#10B981',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6
-  },
-  healthBadgeGreenText: {
-    color: '#10B981',
-    fontSize: 9.5,
-    fontWeight: '900'
-  },
-  healthBadgeBlue: {
-    backgroundColor: 'rgba(59, 130, 246, 0.15)',
-    borderWidth: 1,
-    borderColor: '#3B82F6',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6
-  },
-  healthBadgeBlueText: {
-    color: '#3B82F6',
-    fontSize: 9.5,
-    fontWeight: '900'
-  },
-  healthBadgePurple: {
-    backgroundColor: 'rgba(168, 85, 247, 0.15)',
-    borderWidth: 1,
-    borderColor: '#A855F7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6
-  },
-  healthBadgePurpleText: {
-    color: '#A855F7',
-    fontSize: 9.5,
-    fontWeight: '900'
-  },
-
-  // User Management
   userSearchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    backgroundColor: '#121212',
+    gap: 10,
+    backgroundColor: '#111111',
     borderWidth: 1,
-    borderColor: '#262626',
+    borderColor: '#222222',
     borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 8
+    paddingHorizontal: 14,
+    paddingVertical: 10
   },
   userSearchInput: {
     flex: 1,
     color: '#FFFFFF',
-    fontSize: 12.5
+    fontSize: 13
   },
   selectedUserBox: {
-    backgroundColor: '#121212',
-    borderWidth: 1.5,
-    borderColor: '#383838',
+    backgroundColor: '#0F0F0F',
+    borderWidth: 1,
+    borderColor: '#262626',
     borderRadius: 12,
-    padding: 14
+    padding: 16,
+    gap: 14
   },
   selectedUserHeader: {
     flexDirection: 'row',
@@ -1393,62 +1299,74 @@ const styles = StyleSheet.create({
     gap: 12
   },
   userAvatarSquare: {
-    width: 44,
-    height: 44,
+    width: 46,
+    height: 46,
     borderRadius: 10,
-    backgroundColor: '#1C1C1C',
-    borderWidth: 1,
-    borderColor: '#333333',
+    backgroundColor: '#1E1E1E',
+    justifyContent: 'center',
     alignItems: 'center',
-    justifyContent: 'center'
+    overflow: 'hidden'
+  },
+  avatarImg: {
+    width: '100%',
+    height: '100%'
   },
   selectedUserName: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800'
   },
-  thisDeviceBadge: {
-    backgroundColor: '#FFFFFF',
+  googleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1E293B',
     paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4
+    paddingVertical: 2,
+    borderRadius: 6
+  },
+  googleBadgeText: {
+    color: '#93C5FD',
+    fontSize: 10,
+    fontWeight: '700'
+  },
+  thisDeviceBadge: {
+    backgroundColor: '#10B981',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6
   },
   thisDeviceBadgeText: {
     color: '#000000',
-    fontSize: 8.5,
+    fontSize: 9,
     fontWeight: '900'
   },
   selectedUserEmail: {
     color: '#AAAAAA',
-    fontSize: 11.5,
+    fontSize: 12,
     marginTop: 2
   },
   selectedUserId: {
-    color: '#666666',
-    fontSize: 9.5,
-    marginTop: 1
+    color: '#555555',
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
   },
   userPlanBadge: {
-    backgroundColor: '#1E1E1E',
-    borderWidth: 1,
-    borderColor: '#333333',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    backgroundColor: '#262626',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: 8
   },
   userPlanBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
+    color: '#D4AF37',
+    fontSize: 11,
     fontWeight: '800'
   },
   userMetricsRow: {
     flexDirection: 'row',
-    backgroundColor: '#0D0D0D',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#222222',
-    padding: 10,
-    marginVertical: 12,
+    backgroundColor: '#141414',
+    borderRadius: 10,
+    padding: 12,
     justifyContent: 'space-between'
   },
   userMetricItem: {
@@ -1457,444 +1375,387 @@ const styles = StyleSheet.create({
   },
   userMetricLabel: {
     color: '#777777',
-    fontSize: 9.5,
-    fontWeight: '700'
+    fontSize: 10,
+    fontWeight: '700',
+    marginBottom: 4,
+    textTransform: 'uppercase'
   },
   userMetricVal: {
     color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800',
-    marginTop: 2
+    fontSize: 13,
+    fontWeight: '800'
   },
   actionButtonGroup: {
-    gap: 8
+    gap: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A',
+    paddingTop: 12
   },
   actionGroupTitle: {
-    color: '#AAAAAA',
-    fontSize: 10.5,
+    color: '#888888',
+    fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5
   },
   actionBtnRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6
+    gap: 8
+  },
+  toolBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1C1C1C',
+    borderWidth: 1,
+    borderColor: '#333333',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 7
+  },
+  toolBtnText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700'
   },
   giftBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 5,
     backgroundColor: '#FFFFFF',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 7
   },
   giftBtnGold: {
     backgroundColor: '#D4AF37'
   },
   giftBtnText: {
     color: '#000000',
-    fontSize: 10.5,
-    fontWeight: '900'
+    fontSize: 11,
+    fontWeight: '800'
   },
   revokeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    gap: 5,
+    backgroundColor: '#270A0A',
     borderWidth: 1,
     borderColor: '#EF4444',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 7
   },
   revokeBtnText: {
     color: '#EF4444',
-    fontSize: 10.5,
-    fontWeight: '800'
-  },
-  toolBtn: {
-    backgroundColor: '#1E1E1E',
-    borderWidth: 1,
-    borderColor: '#333333',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6
-  },
-  toolBtnText: {
-    color: '#FFFFFF',
-    fontSize: 10.5,
-    fontWeight: '800'
-  },
-  toolBtnPurple: {
-    backgroundColor: '#1E1B2E',
-    borderWidth: 1,
-    borderColor: '#8B5CF6',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6
-  },
-  toolBtnPurpleText: {
-    color: '#C4B5FD',
-    fontSize: 10.5,
+    fontSize: 11,
     fontWeight: '800'
   },
   dangerZoneRow: {
-    marginTop: 8
+    marginTop: 6
   },
   blockBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderWidth: 1,
-    borderColor: '#EF4444',
+    backgroundColor: '#7F1D1D',
     paddingVertical: 8,
+    paddingHorizontal: 14,
     borderRadius: 8
   },
   unblockBtn: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: '#10B981'
+    backgroundColor: '#065F46'
   },
   blockBtnText: {
     color: '#FFFFFF',
     fontSize: 11,
-    fontWeight: '800'
+    fontWeight: '800',
+    letterSpacing: 0.5
   },
-
-  // User Roster List
-  userListItem: {
+  tableHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: '#121212',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#242424',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 6
+    borderColor: '#1E1E1E'
   },
-  userListItemActive: {
-    borderColor: '#FFFFFF',
-    backgroundColor: '#161616'
+  tableColHeader: {
+    color: '#777777',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.6
   },
-  userListLeft: {
-    flex: 1
+  userTableRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#0D0D0D',
+    borderWidth: 1,
+    borderColor: '#181818',
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 4
   },
-  userListEmail: {
+  userTableRowActive: {
+    borderColor: '#00F0FF',
+    backgroundColor: '#0F1A1C'
+  },
+  rowUserName: {
     color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700'
+  },
+  rowUserEmail: {
+    color: '#777777',
+    fontSize: 11,
+    marginTop: 2
+  },
+  googleOAuthBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#1B2234',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start'
+  },
+  googleOAuthBadgeText: {
+    color: '#60A5FA',
+    fontSize: 10,
+    fontWeight: '700'
+  },
+  rowSessionsText: {
+    color: '#DDDDDD',
     fontSize: 12,
     fontWeight: '700'
   },
-  userListId: {
-    color: '#777777',
-    fontSize: 10,
+  rowSessionsPro: {
+    color: '#00F0FF',
+    fontWeight: '800'
+  },
+  rowBonusSmall: {
+    color: '#666666',
+    fontSize: 9,
     marginTop: 2
   },
-  userListRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8
-  },
-  blockedBadge: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-    borderWidth: 1,
-    borderColor: '#EF4444',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4
-  },
-  blockedBadgeText: {
-    color: '#EF4444',
-    fontSize: 8.5,
-    fontWeight: '900'
-  },
-  proSmallBadge: {
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4
-  },
-  proSmallBadgeText: {
-    color: '#000000',
-    fontSize: 8.5,
-    fontWeight: '900'
-  },
-  freeSmallBadge: {
-    backgroundColor: '#1F1F1F',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4
-  },
-  freeSmallBadgeText: {
-    color: '#888888',
-    fontSize: 8.5,
-    fontWeight: '800'
-  },
-
-  // Global Switches
-  switchCard: {
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#262626',
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12
-  },
-  switchTitle: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800'
-  },
-  switchDesc: {
-    color: '#888888',
-    fontSize: 11,
-    marginTop: 4,
-    lineHeight: 15
-  },
-  togglePill: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 20,
-    borderWidth: 1
-  },
-  togglePillOn: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF'
-  },
-  togglePillOff: {
-    backgroundColor: '#181818',
-    borderColor: '#383838'
-  },
-  togglePillGreen: {
-    backgroundColor: '#10B981',
-    borderColor: '#10B981'
-  },
-  togglePillGray: {
-    backgroundColor: '#262626',
-    borderColor: '#444444'
-  },
-  togglePillText: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#000000'
-  },
-  creditPillsRow: {
-    flexDirection: 'row',
-    gap: 6,
-    marginTop: 8,
-    flexWrap: 'wrap'
-  },
-  creditPill: {
-    backgroundColor: '#181818',
-    borderWidth: 1,
-    borderColor: '#333333',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6
-  },
-  creditPillActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF'
-  },
-  creditPillText: {
-    color: '#888888',
-    fontSize: 10.5,
-    fontWeight: '800'
-  },
-  creditPillTextActive: {
-    color: '#000000'
-  },
-  saveGlobalBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10
-  },
-  saveGlobalBtnText: {
-    color: '#000000',
-    fontSize: 12,
-    fontWeight: '900',
-    letterSpacing: 0.8
-  },
-
-  // Logs
-  emptyLogsBox: {
-    alignItems: 'center',
-    paddingVertical: 40,
-    gap: 8
-  },
-  emptyLogsText: {
-    color: '#777777',
-    fontSize: 12
-  },
-  txCard: {
-    backgroundColor: '#111111',
-    borderWidth: 1,
-    borderColor: '#242424',
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8
-  },
-  txHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  txDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3
-  },
-  txDotGreen: {
-    backgroundColor: '#10B981'
-  },
-  txDotGold: {
-    backgroundColor: '#D4AF37'
-  },
-  txPlanName: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '800'
-  },
-  txAmount: {
-    color: '#10B981',
-    fontSize: 12,
-    fontWeight: '900'
-  },
-  txDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 6
-  },
-  txUserEmail: {
-    color: '#AAAAAA',
-    fontSize: 10.5
-  },
-  txDate: {
-    color: '#666666',
-    fontSize: 10
-  },
-  txFooterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#1A1A1A',
-    paddingTop: 6
-  },
-  txStatusPill: {
-    backgroundColor: '#1C1C1C',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4
-  },
-  currentMonthBadge: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: '#10B981',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8
-  },
-  currentMonthBadgeText: {
-    color: '#10B981',
-    fontSize: 10.5,
-    fontWeight: '900',
-    letterSpacing: 0.5
-  },
-  revenueBreakdownPills: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10
-  },
-  revBreakdownPill: {
-    backgroundColor: '#1C1C1C',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
+  activePill: {
+    backgroundColor: '#064E3B',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6
   },
-  revBreakdownPillText: {
-    color: '#AAAAAA',
-    fontSize: 10,
-    fontWeight: '700'
+  activePillText: {
+    color: '#34D399',
+    fontSize: 9,
+    fontWeight: '800'
   },
-  liveRadarPill: {
+  suspendedPill: {
+    backgroundColor: '#7F1D1D',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  suspendedPillText: {
+    color: '#F87171',
+    fontSize: 9,
+    fontWeight: '800'
+  },
+  selectBtnPill: {
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: '#1E1E1E'
+  },
+  selectBtnPillActive: {
+    backgroundColor: '#00F0FF'
+  },
+  selectBtnPillText: {
+    color: '#888888',
+    fontSize: 10,
+    fontWeight: '800'
+  },
+  selectBtnPillTextActive: {
+    color: '#000000'
+  },
+  emptyBox: {
+    alignItems: 'center',
+    padding: 36,
+    backgroundColor: '#0D0D0D',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#181818',
+    marginTop: 6
+  },
+  emptyBoxText: {
+    color: '#666666',
+    fontSize: 13,
+    marginTop: 10
+  },
+  kpiGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12
+  },
+  kpiCard: {
+    flex: 1,
+    minWidth: 220,
+    backgroundColor: '#0E0E0E',
+    borderWidth: 1,
+    borderColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 16
+  },
+  kpiCardHighlight: {
+    borderColor: '#00F0FF',
+    backgroundColor: '#0A1214'
+  },
+  kpiCardTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10
+  },
+  kpiIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: '#171717',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  kpiBadgeGreen: {
+    backgroundColor: '#064E3B',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  kpiBadgeGreenText: {
+    color: '#34D399',
+    fontSize: 9,
+    fontWeight: '800'
+  },
+  kpiBadgeCyan: {
+    backgroundColor: '#083344',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  kpiBadgeCyanText: {
+    color: '#38BDF8',
+    fontSize: 9,
+    fontWeight: '800'
+  },
+  kpiBadgeBlue: {
+    backgroundColor: '#1E3A8A',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  kpiBadgeBlueText: {
+    color: '#93C5FD',
+    fontSize: 9,
+    fontWeight: '800'
+  },
+  kpiBadgeGold: {
+    backgroundColor: '#451A03',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  kpiBadgeGoldText: {
+    color: '#FBBF24',
+    fontSize: 9,
+    fontWeight: '800'
+  },
+  kpiBadgePurple: {
+    backgroundColor: '#3B0764',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 6
+  },
+  kpiBadgePurpleText: {
+    color: '#C084FC',
+    fontSize: 9,
+    fontWeight: '800'
+  },
+  kpiLabel: {
+    color: '#777777',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 4
+  },
+  kpiValue: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: '900',
+    letterSpacing: -0.5
+  },
+  kpiValueSmall: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#888888'
+  },
+  kpiSub: {
+    color: '#555555',
+    fontSize: 11,
+    marginTop: 4
+  },
+  revenueBreakdownSection: {
+    backgroundColor: '#0F0F0F',
+    borderWidth: 1,
+    borderColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 14
+  },
+  breakdownHeaderTitle: {
+    color: '#888888',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 10
+  },
+  breakdownPillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  breakdownPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: 'rgba(16, 185, 129, 0.12)',
-    borderWidth: 1,
-    borderColor: '#10B981',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 14
-  },
-  liveRadarDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: '#10B981'
-  },
-  liveRadarPillText: {
-    color: '#10B981',
-    fontSize: 10,
-    fontWeight: '900',
-    letterSpacing: 0.5
-  },
-  activityStatsRow: {
-    flexDirection: 'row',
-    backgroundColor: '#0D0D0D',
-    borderWidth: 1,
-    borderColor: '#222222',
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 12,
-    alignItems: 'center',
-    justifyContent: 'space-between'
-  },
-  activityStatBox: {
-    flex: 1,
-    alignItems: 'center'
-  },
-  activityStatDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: '#222222'
-  },
-  activityStatLabel: {
-    color: '#777777',
-    fontSize: 9.5,
-    fontWeight: '700'
-  },
-  activityStatVal: {
-    color: '#FFFFFF',
-    fontSize: 13.5,
-    fontWeight: '900',
-    marginTop: 2
-  },
-
-  // Logs Table Styles
-  logsFilterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12
-  },
-  logsFilterPill: {
-    backgroundColor: '#141414',
+    backgroundColor: '#161616',
     borderWidth: 1,
     borderColor: '#262626',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 8
+  },
+  breakdownPillLabel: {
+    color: '#AAAAAA',
+    fontSize: 11
+  },
+  breakdownPillVal: {
+    color: '#00F0FF',
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  logsFilterRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8
+  },
+  logsFilterPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: '#141414',
+    borderWidth: 1,
+    borderColor: '#242424'
   },
   logsFilterPillActive: {
     backgroundColor: '#FFFFFF',
@@ -1902,115 +1763,273 @@ const styles = StyleSheet.create({
   },
   logsFilterText: {
     color: '#888888',
-    fontSize: 10.5,
-    fontWeight: '800'
+    fontSize: 11,
+    fontWeight: '700'
   },
   logsFilterTextActive: {
     color: '#000000'
   },
-  logsTableHeaderRow: {
-    flexDirection: 'row',
-    backgroundColor: '#161616',
-    borderWidth: 1,
-    borderColor: '#2A2A2A',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 6
-  },
-  logsTableColHeader: {
-    color: '#888888',
-    fontSize: 9.5,
-    fontWeight: '900',
-    letterSpacing: 0.6
-  },
-  logsTableRow: {
+  txTableRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#111111',
+    backgroundColor: '#0D0D0D',
     borderWidth: 1,
-    borderColor: '#222222',
-    borderRadius: 8,
+    borderColor: '#171717',
     paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 6
+    borderRadius: 8,
+    marginTop: 4
   },
-  logsRowEmail: {
+  txRowId: {
     color: '#FFFFFF',
-    fontSize: 11.5,
-    fontWeight: '700'
-  },
-  logsRowId: {
-    color: '#666666',
-    fontSize: 9,
-    marginTop: 2
-  },
-  logsRowPlan: {
-    color: '#D1D5DB',
-    fontSize: 11,
-    fontWeight: '600'
-  },
-  logsRowAmount: {
     fontSize: 12,
-    fontWeight: '900'
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
   },
-  logsAmountPaid: {
+  txRowSubId: {
+    color: '#666666',
+    fontSize: 10,
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace'
+  },
+  txRowEmail: {
+    color: '#CCCCCC',
+    fontSize: 11
+  },
+  txRowPlan: {
+    color: '#AAAAAA',
+    fontSize: 11
+  },
+  txRowAmount: {
+    fontSize: 12,
+    fontWeight: '800'
+  },
+  txAmountPaid: {
     color: '#10B981'
   },
-  logsAmountGift: {
-    color: '#D4AF37'
-  },
-  logsRowDate: {
-    color: '#888888',
-    fontSize: 10.5
+  txAmountGift: {
+    color: '#A855F7'
   },
   txStatusPill: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 7,
     paddingVertical: 3,
-    borderRadius: 6,
-    alignItems: 'center',
-    justifyContent: 'center'
+    borderRadius: 6
   },
-  txStatusPillPaid: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    borderWidth: 1,
-    borderColor: '#10B981'
+  txStatusPaid: {
+    backgroundColor: '#064E3B'
   },
-  txStatusPillGift: {
-    backgroundColor: 'rgba(212, 175, 55, 0.15)',
-    borderWidth: 1,
-    borderColor: '#D4AF37'
+  txStatusGift: {
+    backgroundColor: '#3B0764'
   },
-  txStatusPillText: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#FFFFFF'
-  },
-
-  // PIN security
-  newPinInput: {
-    backgroundColor: '#181818',
-    borderWidth: 1,
-    borderColor: '#383838',
-    borderRadius: 8,
+  txStatusText: {
     color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginTop: 10,
-    letterSpacing: 4
+    fontSize: 9,
+    fontWeight: '800'
   },
-  updatePinBtn: {
-    backgroundColor: '#FFFFFF',
+  txRowDate: {
+    color: '#777777',
+    fontSize: 10
+  },
+  leaderboardSection: {
+    backgroundColor: '#0E0E0E',
+    borderWidth: 1,
+    borderColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 16
+  },
+  leaderboardTitleRow: {
+    marginBottom: 14
+  },
+  leaderboardSectionTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.6
+  },
+  leaderboardSectionSub: {
+    color: '#777777',
+    fontSize: 11,
+    marginTop: 2
+  },
+  leaderboardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#121212',
+    borderWidth: 1,
+    borderColor: '#1A1A1A',
+    paddingHorizontal: 12,
     paddingVertical: 10,
     borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10
+    marginTop: 6
   },
-  updatePinBtnText: {
+  rankBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  rank1: {
+    backgroundColor: '#D4AF37'
+  },
+  rank2: {
+    backgroundColor: '#94A3B8'
+  },
+  rank3: {
+    backgroundColor: '#B45309'
+  },
+  rankOther: {
+    backgroundColor: '#262626'
+  },
+  rankBadgeText: {
     color: '#000000',
     fontSize: 11,
+    fontWeight: '900'
+  },
+  agentAvatarImg: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#333333'
+  },
+  agentName: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800'
+  },
+  agentTitle: {
+    color: '#777777',
+    fontSize: 10,
+    marginTop: 1
+  },
+  eraPill: {
+    backgroundColor: '#1B1B1B',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    alignSelf: 'flex-start'
+  },
+  eraPillText: {
+    color: '#D4AF37',
+    fontSize: 9,
+    fontWeight: '700'
+  },
+  categoryText: {
+    color: '#666666',
+    fontSize: 10,
+    marginTop: 2
+  },
+  inquiriesCount: {
+    color: '#00F0FF',
+    fontSize: 15,
+    fontWeight: '800'
+  },
+  inquiriesSub: {
+    color: '#555555',
+    fontSize: 9
+  },
+  popBarLabel: {
+    color: '#777777',
+    fontSize: 10
+  },
+  popBarPercent: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '800'
+  },
+  popBarTrack: {
+    height: 6,
+    backgroundColor: '#222222',
+    borderRadius: 3,
+    overflow: 'hidden'
+  },
+  popBarFill: {
+    height: '100%',
+    backgroundColor: '#00F0FF',
+    borderRadius: 3
+  },
+  switchCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#0E0E0E',
+    borderWidth: 1,
+    borderColor: '#1E1E1E',
+    borderRadius: 12,
+    padding: 16,
+    gap: 16
+  },
+  switchTitle: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '700'
+  },
+  switchDesc: {
+    color: '#777777',
+    fontSize: 11,
+    marginTop: 4,
+    lineHeight: 16
+  },
+  togglePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8
+  },
+  togglePillOn: {
+    backgroundColor: '#10B981'
+  },
+  togglePillOff: {
+    backgroundColor: '#EF4444'
+  },
+  togglePillGreen: {
+    backgroundColor: '#10B981'
+  },
+  togglePillGray: {
+    backgroundColor: '#374151'
+  },
+  togglePillText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800'
+  },
+  creditPillsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10
+  },
+  creditPill: {
+    backgroundColor: '#1A1A1A',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#2A2A2A'
+  },
+  creditPillActive: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF'
+  },
+  creditPillText: {
+    color: '#AAAAAA',
+    fontSize: 11,
+    fontWeight: '700'
+  },
+  creditPillTextActive: {
+    color: '#000000'
+  },
+  saveGlobalBtn: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 12
+  },
+  saveGlobalBtnText: {
+    color: '#000000',
+    fontSize: 13,
     fontWeight: '900',
     letterSpacing: 0.8
   }

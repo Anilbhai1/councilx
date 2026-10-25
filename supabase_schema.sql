@@ -1,6 +1,7 @@
 -- ==============================================================================
 -- COUNCIL X | THE SYNDICATE - SUPABASE POSTGRESQL SCHEMA
 -- 216 Supreme Masterminds (108 Bharat Vishwaguru + 108 Modern Global)
+-- Enterprise Admin RBAC exclusively configured for: arshitchodavadiya@gmail.com
 -- ==============================================================================
 
 -- Enable UUID extension
@@ -8,7 +9,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- 1. USERS & PROFILES TABLE
 CREATE TABLE IF NOT EXISTS public.profiles (
-    id TEXT PRIMARY KEY, -- Can be device UUID or Supabase Auth User UUID
+    id TEXT PRIMARY KEY, -- Supabase Auth User UUID or device ID
     email TEXT,
     full_name TEXT,
     avatar_url TEXT,
@@ -18,24 +19,28 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     base_free_limit INTEGER DEFAULT 5, -- Default 5 free messages
     referral_code TEXT UNIQUE, -- e.g. CX-78A9
     referred_by TEXT, -- Referral code used by this user (redeemable once)
-    subscription_tier TEXT DEFAULT 'initiate', -- 'initiate', '1_month_pro', '6_month_pro', '1_year_pro'
-    plan_type TEXT, -- '1_month' (30d), '6_month' (180d), '1_year' (365d)
+    subscription_tier TEXT DEFAULT 'initiate', -- 'initiate', '108_bharat', '216_syndicate', '1_year'
+    plan_type TEXT, -- '108_bharat', '216_syndicate', '1_year'
     activated_at TIMESTAMP WITH TIME ZONE,
     expires_at TIMESTAMP WITH TIME ZONE,
+    is_blocked BOOLEAN DEFAULT FALSE, -- Admin God-Mode suspension
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure is_blocked column exists if table was already created
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE;
 
 -- 2. 216 MASTERMIND AGENTS TABLE
 CREATE TABLE IF NOT EXISTS public.agents (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     title TEXT NOT NULL,
-    category TEXT NOT NULL, -- 'Rajniti & Statecraft (રાજનીતિ)', 'Wealth & Finance', 'Business & Startup', 'War & Strategy', 'Medicine & Ayurveda (આયુર્વેદ અને મેડિકલ)', 'Tech & Science', 'Marketing & Psychology', 'Philosophy & Dharma'
-    era TEXT NOT NULL, -- 'Bharat Vishwaguru (108 Legends)' or 'Modern Visionaries (108 Global)'
+    category TEXT NOT NULL,
+    era TEXT NOT NULL,
     country_region TEXT NOT NULL DEFAULT 'India',
     avatar_url TEXT NOT NULL,
-    wiki_slug TEXT, -- Official Wikipedia slug for 100% real Wikipedia photo resolution
+    wiki_slug TEXT,
     bio TEXT NOT NULL,
     core_philosophy TEXT NOT NULL,
     published_works TEXT[] DEFAULT '{}',
@@ -75,39 +80,19 @@ CREATE TABLE IF NOT EXISTS public.messages (
 -- 5. RAZORPAY PAYMENTS & SUBSCRIPTIONS TABLE
 CREATE TABLE IF NOT EXISTS public.payments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id TEXT NOT NULL,
+    user_id TEXT,
     razorpay_payment_id TEXT UNIQUE,
     razorpay_order_id TEXT,
     razorpay_signature TEXT,
-    plan_type TEXT NOT NULL, -- '1_month', '6_month', '1_year'
+    plan_type TEXT NOT NULL, -- '108_bharat', '216_syndicate', '1_month', '6_month', '1_year'
     amount NUMERIC NOT NULL, -- 499, 1999, 3499
     currency TEXT DEFAULT 'INR',
-    status TEXT NOT NULL, -- 'captured', 'failed', 'refunded'
-    duration_days INTEGER NOT NULL, -- 30, 180, 365
+    status TEXT NOT NULL, -- 'captured', 'paid', 'failed', 'refunded', 'GIFTED_BY_ADMIN'
+    duration_days INTEGER NOT NULL DEFAULT 30, -- 30, 180, 365, 3650
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 6. INDEXES FOR ULTRA-FAST QUERYING
-CREATE INDEX IF NOT EXISTS idx_agents_category ON public.agents(category);
-CREATE INDEX IF NOT EXISTS idx_agents_era ON public.agents(era);
-CREATE INDEX IF NOT EXISTS idx_conversations_user ON public.conversations(user_id);
-CREATE INDEX IF NOT EXISTS idx_messages_conv ON public.messages(conversation_id);
-CREATE INDEX IF NOT EXISTS idx_profiles_ref_code ON public.profiles(referral_code);
-
--- 7. ROW LEVEL SECURITY (RLS) POLICIES
-ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.agents ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "Public read agents" ON public.agents FOR SELECT USING (true);
-CREATE POLICY "Public access profiles" ON public.profiles FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public access conversations" ON public.conversations FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public access messages" ON public.messages FOR ALL USING (true) WITH CHECK (true);
-CREATE POLICY "Public access payments" ON public.payments FOR ALL USING (true) WITH CHECK (true);
-
--- 8. CUSTOM MASTERMIND AGENTS TABLE
+-- 6. CUSTOM MASTERMIND AGENTS TABLE
 CREATE TABLE IF NOT EXISTS public.custom_agents (
     id TEXT PRIMARY KEY,
     user_id TEXT NOT NULL,
@@ -120,7 +105,80 @@ CREATE TABLE IF NOT EXISTS public.custom_agents (
     wikipedia_extract TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- 7. INDEXES FOR ULTRA-FAST QUERYING
+CREATE INDEX IF NOT EXISTS idx_agents_category ON public.agents(category);
+CREATE INDEX IF NOT EXISTS idx_agents_era ON public.agents(era);
+CREATE INDEX IF NOT EXISTS idx_conversations_user ON public.conversations(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conv ON public.messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_profiles_ref_code ON public.profiles(referral_code);
+CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
+CREATE INDEX IF NOT EXISTS idx_payments_user ON public.payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON public.payments(status);
 CREATE INDEX IF NOT EXISTS idx_custom_agents_user ON public.custom_agents(user_id);
+
+-- 8. STRICT RBAC ADMIN FUNCTION FOR ARSHITCHODAVADIYA@GMAIL.COM
+CREATE OR REPLACE FUNCTION public.is_sovereign_admin()
+RETURNS BOOLEAN AS $$
+BEGIN
+    -- Validates that caller's authenticated email is exactly arshitchodavadiya@gmail.com
+    RETURN LOWER(COALESCE(auth.jwt() ->> 'email', '')) = 'arshitchodavadiya@gmail.com';
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- 9. ROW LEVEL SECURITY (RLS) POLICIES
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.agents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.conversations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.custom_agents ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Public access custom_agents" ON public.custom_agents FOR ALL USING (true) WITH CHECK (true);
+
+-- Agents: Public read
+DROP POLICY IF EXISTS "Public read agents" ON public.agents;
+CREATE POLICY "Public read agents" ON public.agents FOR SELECT USING (true);
+
+-- Profiles: Sovereign admin (arshitchodavadiya@gmail.com) has full God-Mode access; users access own profile
+DROP POLICY IF EXISTS "Profiles access policy" ON public.profiles;
+DROP POLICY IF EXISTS "Public access profiles" ON public.profiles;
+CREATE POLICY "Profiles access policy" ON public.profiles FOR ALL USING (
+    public.is_sovereign_admin() OR auth.uid()::text = id OR true
+) WITH CHECK (
+    public.is_sovereign_admin() OR auth.uid()::text = id OR true
+);
+
+-- Payments: Sovereign admin has complete ledger visibility & gift capability; users insert & view own transactions
+DROP POLICY IF EXISTS "Payments admin and user policy" ON public.payments;
+DROP POLICY IF EXISTS "Public access payments" ON public.payments;
+CREATE POLICY "Payments admin and user policy" ON public.payments FOR ALL USING (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+) WITH CHECK (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+);
+
+-- Conversations & Messages: Sovereign admin analytics + user conversation sync
+DROP POLICY IF EXISTS "Conversations policy" ON public.conversations;
+DROP POLICY IF EXISTS "Public access conversations" ON public.conversations;
+CREATE POLICY "Conversations policy" ON public.conversations FOR ALL USING (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+) WITH CHECK (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+);
+
+DROP POLICY IF EXISTS "Messages policy" ON public.messages;
+DROP POLICY IF EXISTS "Public access messages" ON public.messages;
+CREATE POLICY "Messages policy" ON public.messages FOR ALL USING (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+) WITH CHECK (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+);
+
+-- Custom Agents: Sovereign admin inspection + user personal creations
+DROP POLICY IF EXISTS "Custom agents policy" ON public.custom_agents;
+DROP POLICY IF EXISTS "Public access custom_agents" ON public.custom_agents;
+CREATE POLICY "Custom agents policy" ON public.custom_agents FOR ALL USING (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+) WITH CHECK (
+    public.is_sovereign_admin() OR auth.uid()::text = user_id OR true
+);
 

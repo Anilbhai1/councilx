@@ -2,10 +2,14 @@
  * COUNCIL X | THE SYNDICATE
  * Application Navigation Controller
  * Manages Google Auth, Home, 1-on-1 Chat, 216 Supreme Council, History & Compliance
+ * 
+ * STRICT RBAC ROUTING:
+ * /admin route is restricted exclusively to: arshitchodavadiya@gmail.com
+ * Unauthorized users are instantly blocked and redirected to Home without exposing any admin data.
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -19,6 +23,7 @@ import PricingScreen from '../screens/PricingScreen';
 import PremiumSuccessScreen from '../screens/PremiumSuccessScreen';
 import { COLORS } from '../theme/colors';
 import { getLocalSession, clearLocalSession, getInitialAuthSync } from '../services/supabaseClient';
+import { adminService, isSovereignEmail, SOVEREIGN_ADMIN_EMAIL } from '../services/adminService';
 
 export default function AppNavigator({ initialAuth, onAuthChange }) {
   const [currentScreen, setCurrentScreen] = useState('Home');
@@ -27,20 +32,37 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     typeof initialAuth === 'boolean' ? initialAuth : getInitialAuthSync()
   );
 
-  // Dedicated Clean /admin, /pricing & /success Route & Deep-Link Listener
+  // Dedicated Clean /admin, /pricing & /success Route & Deep-Link Listener with STRICT RBAC
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const checkRoute = () => {
+      const checkRoute = async () => {
         const path = (window.location.pathname || '').toLowerCase();
         const search = (window.location.search || '').toLowerCase();
         const hash = (window.location.hash || '').toLowerCase();
+
         if (
           path === '/admin' ||
           path.startsWith('/admin') ||
           search.includes('admin') ||
           hash.includes('admin')
         ) {
-          setCurrentScreen('Admin');
+          // STRICT RBAC CHECK: Verify authenticated email is arshitchodavadiya@gmail.com
+          const activeEmail = await adminService.getActiveUserEmail();
+          if (isSovereignEmail(activeEmail)) {
+            setCurrentScreen('Admin');
+          } else {
+            // Instantly block and redirect to home screen without exposing any admin data
+            window.history.replaceState(null, '', '/');
+            setCurrentScreen('Home');
+            setTimeout(() => {
+              window.alert(
+                'ACCESS DENIED (સુરક્ષા અવરોધ):\n\n' +
+                'Strict Role-Based Access Control is enforced.\n' +
+                'This Super Admin route is restricted exclusively to arshitchodavadiya@gmail.com.\n' +
+                'Unauthorized access attempts are blocked and logged.'
+              );
+            }, 100);
+          }
         } else if (
           path === '/pricing' ||
           path.startsWith('/pricing') ||
@@ -66,15 +88,22 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
 
       window.addEventListener('popstate', checkRoute);
 
-      // Backdoor console helpers for web developers
-      window.__councilx_open_admin = () => {
-        setCurrentScreen('Admin');
-        window.history.pushState(null, '', '/admin');
+      // Backdoor console helper for Sovereign Administrator
+      window.__councilx_open_admin = async () => {
+        const activeEmail = await adminService.getActiveUserEmail();
+        if (isSovereignEmail(activeEmail)) {
+          setCurrentScreen('Admin');
+          window.history.pushState(null, '', '/admin');
+        } else {
+          window.alert('ACCESS DENIED: Restricted exclusively to ' + SOVEREIGN_ADMIN_EMAIL);
+        }
       };
+
       window.__councilx_open_pricing = () => {
         setCurrentScreen('Pricing');
         window.history.pushState(null, '', '/pricing');
       };
+
       window.__councilx_open_success = (params = {}) => {
         setScreenParams(params);
         setCurrentScreen('PremiumSuccess');
@@ -111,9 +140,24 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
   };
 
   const navigation = {
-    navigate: (screenName, params = {}) => {
+    navigate: async (screenName, params = {}) => {
+      // STRICT RBAC CHECK FOR ADMIN NAVIGATION
+      if (screenName === 'Admin') {
+        const activeEmail = await adminService.getActiveUserEmail();
+        if (!isSovereignEmail(activeEmail)) {
+          const alertMsg = 'ACCESS DENIED:\nStrict RBAC is active. Admin dashboard is restricted exclusively to ' + SOVEREIGN_ADMIN_EMAIL;
+          if (Platform.OS === 'web' && typeof window !== 'undefined') {
+            window.alert(alertMsg);
+          } else {
+            Alert.alert('Access Denied', alertMsg);
+          }
+          return;
+        }
+      }
+
       setScreenParams(params);
       setCurrentScreen(screenName);
+
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         if (screenName === 'Admin') {
           window.history.pushState(null, '', '/admin');
@@ -154,7 +198,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     }
   };
 
-  // Dedicated Admin Screen: Accessible via /admin route independently of standard user auth
+  // Dedicated Admin Screen: Accessible exclusively if authenticated email is arshitchodavadiya@gmail.com
   if (currentScreen === 'Admin') {
     return (
       <View style={styles.container}>
