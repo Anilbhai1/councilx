@@ -18,13 +18,13 @@ import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import PricingScreen from '../screens/PricingScreen';
 import PremiumSuccessScreen from '../screens/PremiumSuccessScreen';
 import { COLORS } from '../theme/colors';
-import { getLocalSession, clearLocalSession } from '../services/supabaseClient';
+import { getLocalSession, clearLocalSession, getInitialAuthSync } from '../services/supabaseClient';
 
 export default function AppNavigator({ initialAuth, onAuthChange }) {
   const [currentScreen, setCurrentScreen] = useState('Home');
   const [screenParams, setScreenParams] = useState({});
   const [isAuthenticated, setIsAuthenticated] = useState(
-    typeof initialAuth === 'boolean' ? initialAuth : null
+    typeof initialAuth === 'boolean' ? initialAuth : getInitialAuthSync()
   );
 
   // Dedicated Clean /admin, /pricing & /success Route & Deep-Link Listener

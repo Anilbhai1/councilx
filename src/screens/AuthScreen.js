@@ -30,6 +30,8 @@ import {
 import { paymentService } from '../services/paymentService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import TermsModal from '../components/TermsModal';
+import InstallAppModal from '../components/InstallAppModal';
+import { pwaService } from '../services/pwaService';
 
 const BREAKTHROUGH_QUOTES = [
   {
@@ -70,6 +72,19 @@ export default function AuthScreen({ onAuthSuccess }) {
   const [showReferralInput, setShowReferralInput] = useState(false);
   const [quoteIndex, setQuoteIndex] = useState(0);
   const [termsVisible, setTermsVisible] = useState(false);
+  const [showInstallModal, setShowInstallModal] = useState(false);
+  const [canInstall, setCanInstall] = useState(false);
+  const [isInstalled, setIsInstalled] = useState(false);
+
+  useEffect(() => {
+    setCanInstall(pwaService.canPromptDirectly());
+    setIsInstalled(pwaService.isInstalled());
+    const unsub = pwaService.subscribe((state) => {
+      setCanInstall(state.canInstall);
+      setIsInstalled(state.isInstalled);
+    });
+    return unsub;
+  }, []);
 
   // Auto-cycle live preview quotes ticker
   useEffect(() => {
@@ -183,6 +198,48 @@ export default function AuthScreen({ onAuthSuccess }) {
 
 
 
+  const handleInstallAppClick = async () => {
+    if (pwaService.canPromptDirectly()) {
+      const res = await pwaService.promptInstall();
+      if (!res.success && (res.isIOS || res.reason === 'no-prompt')) {
+        setShowInstallModal(true);
+      }
+    } else {
+      setShowInstallModal(true);
+    }
+  };
+
+  const handleInstantAccess = async () => {
+    setLoading(true);
+    try {
+      if (referralInput.trim()) {
+        try {
+          await paymentService.redeemReferralCode(referralInput.trim());
+        } catch (e) {
+          console.warn('Referral redemption notice:', e?.message || e);
+        }
+      }
+
+      await saveLocalSession({
+        email: 'member@councilx.ai',
+        name: 'Sovereign Member',
+        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces',
+        provider: 'guest',
+        free_chats_remaining: 5,
+        extra_agent_slots: 0,
+        isAuthenticated: true
+      });
+
+      if (onAuthSuccess) {
+        onAuthSuccess();
+      }
+    } catch (e) {
+      console.warn('Instant access notice:', e?.message || e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleApplyReferral = async () => {
     if (!referralInput.trim()) {
       Alert.alert('Referral Code', 'Please enter a valid code (e.g. CX-PRO).');
@@ -196,6 +253,21 @@ export default function AuthScreen({ onAuthSuccess }) {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Top Action Bar with Install App Button */}
+      {!isInstalled && (
+        <View style={styles.authTopBar}>
+          <TouchableOpacity
+            style={styles.installAppBtn}
+            onPress={handleInstallAppClick}
+            activeOpacity={0.8}
+            accessibilityLabel="Install CouncilX App on Mobile / Desktop"
+          >
+            <Ionicons name="arrow-down-circle" size={14} color="#000000" />
+            <Text style={styles.installAppBtnText}>Install App</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
@@ -306,6 +378,21 @@ export default function AuthScreen({ onAuthSuccess }) {
           )}
         </TouchableOpacity>
 
+        {/* Instant Access Sovereign War Room / VIP Guest Access Button */}
+        <TouchableOpacity
+          style={[styles.instantAccessBtn, loading && styles.btnDisabled]}
+          onPress={handleInstantAccess}
+          disabled={loading}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="flash" size={18} color="#00F0FF" style={{ marginRight: 8 }} />
+          <View style={styles.ctaTextWrap}>
+            <Text style={styles.instantAccessBtnText}>ENTER SOVEREIGN WAR ROOM (INSTANT ACCESS)</Text>
+            <Text style={styles.instantAccessBtnSub}>NO LOGIN REQUIRED • 5 FREE SESSIONS READY</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={16} color="#00F0FF" style={{ marginLeft: 8 }} />
+        </TouchableOpacity>
+
         {/* Promotional / Referral Code Box */}
         <View style={styles.referralContainer}>
           {!showReferralInput ? (
@@ -357,6 +444,15 @@ export default function AuthScreen({ onAuthSuccess }) {
       <TermsModal
         visible={termsVisible}
         onClose={() => setTermsVisible(false)}
+      />
+
+      {/* PWA Install Guidance Modal */}
+      <InstallAppModal
+        visible={showInstallModal}
+        onClose={() => setShowInstallModal(false)}
+        onDirectInstall={handleInstallAppClick}
+        canPromptDirectly={canInstall}
+        isIOS={pwaService.isIOS()}
       />
     </SafeAreaView>
   );
@@ -639,5 +735,72 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 0.5,
     textDecorationLine: 'underline'
+  },
+  authTopBar: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 4,
+    zIndex: 10,
+  },
+  installAppBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#00F0FF',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#38BDF8',
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.55,
+    shadowRadius: 8,
+    elevation: 5,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {})
+  },
+  installAppBtnText: {
+    color: '#000000',
+    fontSize: 11,
+    fontWeight: '900',
+    letterSpacing: 0.5,
+  },
+  instantAccessBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#111827',
+    borderWidth: 1.5,
+    borderColor: '#00F0FF',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    width: '100%',
+    marginTop: 12,
+    marginBottom: 4,
+    shadowColor: '#00F0FF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {})
+  },
+  instantAccessBtnText: {
+    color: '#00F0FF',
+    fontSize: 12.5,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+    textAlign: 'center',
+  },
+  instantAccessBtnSub: {
+    color: '#94A3B8',
+    fontSize: 9.5,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    marginTop: 2,
+    textAlign: 'center',
   }
 });

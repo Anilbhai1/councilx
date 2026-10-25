@@ -39,7 +39,7 @@ module.exports = async function handler(req, res) {
       userId = 'anonymous'
     } = body;
 
-    const keyId = process.env.RAZORPAY_KEY_ID || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID
+    const keyId = process.env.RAZORPAY_KEY_ID || process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC';
     const secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!secret || secret === 'your_razorpay_key_secret_here') {

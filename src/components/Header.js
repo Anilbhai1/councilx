@@ -240,11 +240,13 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 9,
     borderRadius: 14,
+    flexShrink: 0,
     shadowColor: '#00F0FF',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.45,
+    shadowOpacity: 0.55,
     shadowRadius: 6,
     elevation: 4,
+    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {})
   },
   installAppBtnText: {
     color: '#000000',

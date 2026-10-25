@@ -21,13 +21,14 @@ import {
   getLocalSession,
   saveLocalSession,
   safeUpsertProfile,
+  getInitialAuthSync,
   COUNCILX_USER_SESSION_KEY
 } from './src/services/supabaseClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { pwaService } from './src/services/pwaService';
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(getInitialAuthSync());
 
   useEffect(() => {
     // Initialize PWA manifest & service worker lifecycle on web

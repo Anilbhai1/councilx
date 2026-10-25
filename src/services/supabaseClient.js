@@ -55,6 +55,28 @@ function getCookie(name) {
 }
 
 /**
+ * Instant synchronous check for active session on Web
+ * Enables zero-delay, zero-flicker instant entry so user is never prompted to log in again
+ */
+export function getInitialAuthSync() {
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    try {
+      if (window.localStorage) {
+        const raw = window.localStorage.getItem(COUNCILX_USER_SESSION_KEY);
+        const legacy = window.localStorage.getItem('@councilx_is_logged_in');
+        if (raw || legacy === 'true') return true;
+      }
+      if (typeof document !== 'undefined' && document.cookie) {
+        if (document.cookie.includes('councilx_session') || document.cookie.includes('councilx_logged_in=true')) {
+          return true;
+        }
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+/**
  * Store the bulletproof local user session in localStorage, cookies, and AsyncStorage
  * Guarantees user stays logged in indefinitely across days, weeks, and browser restarts
  */

@@ -307,6 +307,15 @@ export const paymentService = {
     return process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || 'pk_test_councilx_syndicate_prod_key';
   },
 
+  async clearSession() {
+    try {
+      const { clearLocalSession } = require('./supabaseClient');
+      await clearLocalSession();
+    } catch (e) {
+      console.warn('paymentService.clearSession notice:', e);
+    }
+  },
+
   /**
    * Get unique device / user ID
    */
