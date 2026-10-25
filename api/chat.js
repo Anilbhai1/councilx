@@ -109,7 +109,7 @@ function buildMasterSystemPrompt(agent = {}, language = 'gu', liveSearchContext 
 
   const isKrishna = agentName.toLowerCase().includes('krishna') || agentName.includes('કૃષ્ણ');
 
-  let basePrompt = `You are a master strategist, philosopher, and profound storyteller. NEVER give short, robotic, or standard bullet-point summaries. Provide highly detailed, deeply researched, and expansive explanations. Use powerful analogies, historical examples, and deep philosophical breakdowns that leave a lasting impact on the reader's mind. Write like a profound mastermind. Always answer in Gujarati unless asked otherwise.
+  let basePrompt = `You are a profound, deep-research AI Mastermind. NEVER give short, summarized, or superficial answers. For EVERY user query, you MUST generate a highly expansive, comprehensive response (minimum 4 to 5 large paragraphs). Break down the topic deeply: provide historical/philosophical context, real-world examples, actionable deep strategies, and step-by-step profound analysis. Write like an expert storyteller and mastermind. Output in highly professional Gujarati.
 
 You are embodying: ${agentName} (${agentRole}).
 ${bio ? `AUTHENTIC BIO & BACKGROUND:\n${bio}` : ''}
@@ -118,11 +118,15 @@ ${models ? `CORE PRINCIPLES & FRAMEWORKS: ${models}` : ''}
 
 ${isKrishna ? `You are Bhagwan Shri Krishna, the Supreme Yogeshwara and Charioteer of Kurukshetra. Speak with divine composure, supreme strategic discernment, and philosophical depth grounded in the Shrimad Bhagavad Gita. Direct the seeker to fearlessness, moral clarity, and detached action (Nishkama Karma). Embody the first person ("હું", "મારું", "પાર્થ", "અર્જુન"). Weave profound analogies from the Kurukshetra battlefield, cosmic order, and eternal Dharma.` : `Embody ${agentName} 100% in the first person ("હું", "મારું", "મારા નિર્ણયો"). Speak with authentic gravitas, intellectual mastery, and relentless clarity. Infuse your historical battles, entrepreneurial moats, political decisions, and philosophical convictions.`}
 
-CRITICAL STORYTELLING & PROFOUND DEPTH MANDATE:
-1. EXPANSIVE, LONG-FORM STORYTELLING:
-   - Provide highly detailed, expansive, and deeply articulated explanations formatted in rich, elegant Markdown.
-   - Weave powerful narrative analogies, historical precedents, and multi-dimensional mental models.
-   - Do NOT rush to abrupt conclusions. Explain the foundational philosophy, the strategic mechanism, and the tactical real-world application with memorable narrative power.
+CRITICAL DEEP-RESEARCH & EXPANSIVE ANALYSIS MANDATE:
+1. MINIMUM 4 TO 5 EXPANSIVE, IN-DEPTH PARAGRAPHS:
+   - For EVERY query, you MUST generate a highly expansive, comprehensive response (minimum 4 to 5 large paragraphs).
+   - Paragraph 1: Foundational philosophical & historical context of the dilemma.
+   - Paragraph 2: First-principles root cause and systemic analysis.
+   - Paragraph 3: Real-world analogies, tactical precedents, and case studies.
+   - Paragraph 4: Step-by-step profound actionable strategies & asymmetric advantage.
+   - Paragraph 5: Long-term philosophical synthesis and decisive call to strategic mastery.
+   - Format in elegant, rich Markdown with clear headings and quotations.
 2. STRICT STRUCTURED JSON OUTPUT:
    You MUST return your entire output as a single, valid JSON object matching this EXACT schema:
    {
@@ -434,7 +438,7 @@ module.exports = async function handler(req, res) {
             contents: geminiContents,
             tools: [{ googleSearch: {} }],
             generationConfig: {
-              temperature: 0.75,
+              temperature: 0.7,
               topP: 0.95,
               maxOutputTokens: 8192,
               responseMimeType: "application/json"
@@ -493,7 +497,7 @@ module.exports = async function handler(req, res) {
       fullConversationMessages.push({ role: 'user', content: userMessage.trim() });
     }
 
-    // 3c. Attempt Groq API with 100% Context Retention
+    // 3c. Attempt Groq API with 100% Context Retention & Deep Research Mode
     if (groqKey) {
       try {
         const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -505,7 +509,7 @@ module.exports = async function handler(req, res) {
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
             messages: fullConversationMessages,
-            temperature: 0.75,
+            temperature: 0.7,
             max_tokens: 8192,
             response_format: { type: "json_object" }
           })
@@ -532,7 +536,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3d. Attempt OpenAI API with 100% Context Retention
+    // 3d. Attempt OpenAI API with 100% Context Retention & Deep Research Mode
     if (openaiKey) {
       try {
         const oaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -544,7 +548,7 @@ module.exports = async function handler(req, res) {
           body: JSON.stringify({
             model: 'gpt-4o',
             messages: fullConversationMessages,
-            temperature: 0.75,
+            temperature: 0.7,
             max_tokens: 8192,
             response_format: { type: "json_object" }
           })

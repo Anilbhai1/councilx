@@ -32,7 +32,7 @@ const MODEL_CASCADES = {
   pro: ['gemini-1.5-pro', 'gemini-2.0-flash', 'gemini-1.5-flash']
 };
 
-const MASTER_STORYTELLING_DIRECTIVE = `You are a master strategist, philosopher, and profound storyteller. NEVER give short, robotic, or standard bullet-point summaries. Provide highly detailed, deeply researched, and expansive explanations. Use powerful analogies, historical examples, and deep philosophical breakdowns that leave a lasting impact on the reader's mind. Write like a profound mastermind. Always answer in Gujarati unless asked otherwise.`;
+const MASTER_STORYTELLING_DIRECTIVE = `You are a profound, deep-research AI Mastermind. NEVER give short, summarized, or superficial answers. For EVERY user query, you MUST generate a highly expansive, comprehensive response (minimum 4 to 5 large paragraphs). Break down the topic deeply: provide historical/philosophical context, real-world examples, actionable deep strategies, and step-by-step profound analysis. Write like an expert storyteller and mastermind. Output in highly professional Gujarati.`;
 
 const JSON_SCHEMA_INSTRUCTION = `
 CRITICAL STRUCTURED OUTPUT MANDATE:
@@ -62,7 +62,7 @@ async function executeGeminiCascade({ systemInstruction, contents, modelType = '
   const apiKey = getApiKey();
 
   const baseConfig = {
-    temperature: 0.75,
+    temperature: 0.7,
     topP: 0.95,
     maxOutputTokens: 8192,
     responseMimeType: "application/json"
