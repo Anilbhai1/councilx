@@ -206,27 +206,33 @@ export default function SyndicateScreen({ route, navigation }) {
         isPremium: status.isPremium
       });
 
+      const replyContent = aiResult.reply || aiResult.content || '';
+      const followUps = Array.isArray(aiResult.follow_ups) && aiResult.follow_ups.length > 0
+        ? aiResult.follow_ups
+        : (Array.isArray(aiResult.followUpQuestions) ? aiResult.followUpQuestions : []);
+
       const assistantMsgId = `msg_a_${Date.now()}`;
       const assistantMsg = {
         id: assistantMsgId,
         role: 'assistant',
         content: '',
         agent_name: t('supremeCouncilBadge', '૨૧૬ મહા-સભા'),
-        followUpQuestions: aiResult.followUpQuestions,
+        follow_ups: followUps,
+        followUpQuestions: followUps,
         createdAt: new Date().toISOString()
       };
 
       setMessages([...updatedMessages, assistantMsg]);
       setLoading(false);
 
-      // Smooth typewriter streaming
-      await streamResponse(aiResult.content, assistantMsgId);
+      // Smooth typewriter streaming of profound long-form response
+      await streamResponse(replyContent, assistantMsgId);
 
-      // Reveal dynamic contextual follow-ups
-      setFollowUpQuestions(aiResult.followUpQuestions || []);
+      // Dynamically map follow_ups to 'STRATEGIC FOLLOW-UPS' UI buttons
+      setFollowUpQuestions(followUps);
 
       // Persist full conversation in COUNCILX_CHAT_ALL_216 and Supabase
-      const finalChat = [...updatedMessages, { ...assistantMsg, content: aiResult.content }];
+      const finalChat = [...updatedMessages, { ...assistantMsg, content: replyContent }];
       await AsyncStorage.setItem(COUNCIL_STORAGE_KEY, JSON.stringify(finalChat));
 
       await chatService.saveConversation({

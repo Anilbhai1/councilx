@@ -258,6 +258,11 @@ export default function ChatScreen({ route, navigation }) {
         isPremium: status.isPremium
       });
 
+      const replyContent = aiResult.reply || aiResult.content || '';
+      const followUps = Array.isArray(aiResult.follow_ups) && aiResult.follow_ups.length > 0
+        ? aiResult.follow_ups
+        : (Array.isArray(aiResult.followUpQuestions) ? aiResult.followUpQuestions : []);
+
       const assistantMsgId = `msg_a_${Date.now()}`;
       const assistantMsg = {
         id: assistantMsgId,
@@ -266,21 +271,22 @@ export default function ChatScreen({ route, navigation }) {
         agent_id: agent.id,
         agent_name: agent.name,
         agent_avatar: guaranteedAvatar,
-        followUpQuestions: aiResult.followUpQuestions,
+        follow_ups: followUps,
+        followUpQuestions: followUps,
         createdAt: new Date().toISOString()
       };
 
       setMessages([...updatedMessages, assistantMsg]);
       setLoading(false);
 
-      // Smooth typewriter streaming
-      await streamResponse(aiResult.content, assistantMsgId);
+      // Smooth typewriter streaming of profound long-form response
+      await streamResponse(replyContent, assistantMsgId);
 
-      // Reveal dynamic context-specific follow-ups
-      setFollowUpQuestions(aiResult.followUpQuestions || []);
+      // Dynamically map follow_ups array to 'STRATEGIC FOLLOW-UPS' UI buttons
+      setFollowUpQuestions(followUps);
 
       // Persist full conversation permanently under isolated storage key
-      const finalChat = [...updatedMessages, { ...assistantMsg, content: aiResult.content }];
+      const finalChat = [...updatedMessages, { ...assistantMsg, content: replyContent }];
       await AsyncStorage.setItem(agentStorageKey, JSON.stringify(finalChat));
 
       await chatService.saveConversation({

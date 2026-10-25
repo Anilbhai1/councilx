@@ -72,8 +72,13 @@ export default function DebateScreen({ navigation }) {
         dilemma: topic
       });
 
-      setDebateContent(result.content);
-      setFollowUps(result.followUpQuestions || []);
+      const replyContent = result.reply || result.content || '';
+      const followUpList = Array.isArray(result.follow_ups) && result.follow_ups.length > 0
+        ? result.follow_ups
+        : (Array.isArray(result.followUpQuestions) ? result.followUpQuestions : []);
+
+      setDebateContent(replyContent);
+      setFollowUps(followUpList);
 
       // Persist to history
       await chatService.saveConversation({
