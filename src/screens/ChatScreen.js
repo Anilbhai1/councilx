@@ -34,6 +34,7 @@ import FormattedMessage from '../components/FormattedMessage';
 import FollowUpChips from '../components/FollowUpChips';
 import QuoteCardModal from '../components/QuoteCardModal';
 import PaywallModal from '../components/PaywallModal';
+import ChatHistoryDrawer from '../components/ChatHistoryDrawer';
 import { geminiService } from '../services/geminiService';
 import { paymentService } from '../services/paymentService';
 import { chatService } from '../services/chatService';
@@ -67,8 +68,9 @@ export default function ChatScreen({ route, navigation }) {
     setHeaderAvatarUri(wiki ? raw : (getGuaranteedAvatarUrl(agent) || fallbackAvatar));
   }, [agent]);
 
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [conversationId, setConversationId] = useState(
-    existingSession?.id || `conv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
+    existingSession?.id || existingSession?.chat_id || chatService.generateChatId()
   );
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -120,11 +122,12 @@ export default function ChatScreen({ route, navigation }) {
     } catch (e) {}
 
     // 1. If explicit session passed via route (Secret Archives / History)
-    if (existingSession && existingSession.id) {
+    if (existingSession && (existingSession.id || existingSession.chat_id)) {
+      const activeId = existingSession.id || existingSession.chat_id;
       let sessionMessages = existingSession.messages;
       if (!sessionMessages || sessionMessages.length === 0) {
         try {
-          const full = await chatService.getConversation(existingSession.id);
+          const full = await chatService.getConversation(activeId);
           if (full && full.messages && full.messages.length > 0) {
             sessionMessages = full.messages;
           }
@@ -132,47 +135,21 @@ export default function ChatScreen({ route, navigation }) {
       }
 
       if (sessionMessages && sessionMessages.length > 0) {
-        setConversationId(existingSession.id);
+        setConversationId(activeId);
         setMessages(sessionMessages);
         const lastMsg = sessionMessages[sessionMessages.length - 1];
-        if (lastMsg && lastMsg.followUpQuestions) {
-          setFollowUpQuestions(lastMsg.followUpQuestions);
+        if (lastMsg && (lastMsg.follow_ups || lastMsg.followUpQuestions)) {
+          setFollowUpQuestions(lastMsg.follow_ups || lastMsg.followUpQuestions);
         }
         return;
       }
     }
 
-    // 2. Load dedicated isolated storage key for this specific agent
-    try {
-      const savedIsolated = await AsyncStorage.getItem(agentStorageKey);
-      if (savedIsolated) {
-        const parsed = JSON.parse(savedIsolated);
-        if (parsed && parsed.length > 0) {
-          setMessages(parsed);
-          const lastMsg = parsed[parsed.length - 1];
-          if (lastMsg && lastMsg.followUpQuestions) {
-            setFollowUpQuestions(lastMsg.followUpQuestions);
-          }
-          return;
-        }
-      }
+    // 2. Strict Session Isolation: Every fresh dialogue gets a unique chat_id.
+    // Old chats are never mixed into new chats!
+    const freshChatId = chatService.generateChatId();
+    setConversationId(freshChatId);
 
-      const allSessions = await chatService.getConversations();
-      const prior = allSessions.find(s => s.agent_id === agent?.id);
-      if (prior && prior.messages && prior.messages.length > 0) {
-        setConversationId(prior.id);
-        setMessages(prior.messages);
-        const lastMsg = prior.messages[prior.messages.length - 1];
-        if (lastMsg && lastMsg.followUpQuestions) {
-          setFollowUpQuestions(lastMsg.followUpQuestions);
-        }
-        return;
-      }
-    } catch (e) {
-      console.warn('Load prior session fallback:', e);
-    }
-
-    // 3. New conversation welcome greeting in first-person
     const welcomeMsg = {
       id: `msg_init_${Date.now()}`,
       role: 'assistant',
@@ -188,6 +165,55 @@ export default function ChatScreen({ route, navigation }) {
     };
     setMessages([welcomeMsg]);
     setFollowUpQuestions([]);
+  };
+
+  /**
+   * Start a brand new, isolated chat session with a unique chat_id
+   */
+  const handleStartNewChat = () => {
+    if (isStreaming) setIsStreaming(false);
+    voiceService.stopListening();
+    const freshChatId = chatService.generateChatId();
+    setConversationId(freshChatId);
+    setInputText('');
+    setFollowUpQuestions([]);
+    const welcomeMsg = {
+      id: `msg_init_${Date.now()}`,
+      role: 'assistant',
+      content: lang === 'gu'
+        ? `હું ${agent?.name || 'માસ્ટરમાઇન્ડ'} છું. તમારો વ્યૂહાત્મક પ્રશ્ન, પડકાર અથવા વ્યાપારિક દ્વિધા રજૂ કરો.`
+        : lang === 'hi'
+        ? `मैं ${agent?.name || 'मास्टरमाइंड'} हूँ। अपनी रणनीतिक दुविधा, चुनौती अथवा प्रश्न प्रस्तुत करें।`
+        : `I am ${agent?.name || 'Mastermind'}. Present your strategic dilemma, operational bottleneck, or challenge.`,
+      agent_id: agent?.id,
+      agent_name: agent?.name,
+      agent_avatar: guaranteedAvatar,
+      createdAt: new Date().toISOString()
+    };
+    setMessages([welcomeMsg]);
+  };
+
+  /**
+   * Resume an individual chat session from Chat History drawer
+   */
+  const handleSelectHistorySession = async (session) => {
+    if (!session) return;
+    const targetId = session.chat_id || session.id;
+    try {
+      setLoading(true);
+      const full = await chatService.getConversation(targetId);
+      const msgs = full?.messages || session.messages || [];
+      setConversationId(targetId);
+      if (msgs.length > 0) {
+        setMessages(msgs);
+        const lastMsg = msgs[msgs.length - 1];
+        setFollowUpQuestions(lastMsg.follow_ups || lastMsg.followUpQuestions || []);
+      }
+    } catch (e) {
+      console.warn('Error loading history session:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   /**
@@ -247,11 +273,12 @@ export default function ChatScreen({ route, navigation }) {
     setUserStatus(newStatus);
 
     try {
-      // Pass full conversation history for permanent long-term memory
+      // Pass full conversation history for 100% context retention in this session
       const aiResult = await geminiService.generateAgentResponse({
         agent,
         userMessage: prompt,
         chatHistory: updatedMessages,
+        chat_id: conversationId,
         language: lang,
         modelType,
         thinkingDepth,
@@ -285,16 +312,17 @@ export default function ChatScreen({ route, navigation }) {
       // Dynamically map follow_ups array to 'STRATEGIC FOLLOW-UPS' UI buttons
       setFollowUpQuestions(followUps);
 
-      // Persist full conversation permanently under isolated storage key
+      // Persist full conversation under unique chat_id in Supabase & AsyncStorage
       const finalChat = [...updatedMessages, { ...assistantMsg, content: replyContent }];
-      await AsyncStorage.setItem(agentStorageKey, JSON.stringify(finalChat));
 
       await chatService.saveConversation({
         id: conversationId,
+        chat_id: conversationId,
+        session_id: conversationId,
         agent_id: agent?.id,
         mode: 'single_agent',
         title: `${agent?.name}: ${prompt.substring(0, 35)}...`,
-        preview: aiResult.content.substring(0, 80),
+        preview: replyContent.substring(0, 80),
         messages: finalChat
       });
     } catch (err) {
@@ -396,19 +424,44 @@ export default function ChatScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={styles.counterBadge}
-          onPress={() => !userStatus.isPremium && setPaywallVisible(true)}
-        >
-          <Ionicons
-            name={userStatus.isPremium ? "shield-checkmark" : "time-outline"}
-            size={11}
-            color="#FFFFFF"
-          />
-          <Text style={styles.counterText}>
-            {userStatus.isPremium ? t('proBadge', 'PRO') : `${userStatus.remainingFree} ${t('freeBadge', 'LEFT')}`}
-          </Text>
-        </TouchableOpacity>
+        {/* Action Header Group */}
+        <View style={styles.headerActionsGroup}>
+          {/* History Sidebar Button */}
+          <TouchableOpacity
+            style={styles.headerActionBtn}
+            onPress={() => setIsHistoryOpen(true)}
+            activeOpacity={0.8}
+            accessibilityLabel="Chat History"
+          >
+            <Ionicons name="time-outline" size={17} color="#D4AF37" />
+          </TouchableOpacity>
+
+          {/* New Chat Button */}
+          <TouchableOpacity
+            style={styles.newChatHeaderBtn}
+            onPress={handleStartNewChat}
+            activeOpacity={0.8}
+            accessibilityLabel="New Chat"
+          >
+            <Ionicons name="add" size={15} color="#000000" style={{ marginRight: 2 }} />
+            <Text style={styles.newChatHeaderBtnText}>New</Text>
+          </TouchableOpacity>
+
+          {/* Freemium / Pro Counter Badge */}
+          <TouchableOpacity
+            style={styles.counterBadge}
+            onPress={() => !userStatus.isPremium && setPaywallVisible(true)}
+          >
+            <Ionicons
+              name={userStatus.isPremium ? "shield-checkmark" : "time-outline"}
+              size={11}
+              color="#FFFFFF"
+            />
+            <Text style={styles.counterText}>
+              {userStatus.isPremium ? t('proBadge', 'PRO') : `${userStatus.remainingFree} ${t('freeBadge', 'LEFT')}`}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Main Message Stream */}
@@ -579,6 +632,17 @@ export default function ChatScreen({ route, navigation }) {
           setUserStatus(updated);
         }}
       />
+
+      {/* ChatGPT / Gemini Style Chat History Sidebar Drawer */}
+      <ChatHistoryDrawer
+        visible={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        currentChatId={conversationId}
+        agentId={agent?.id}
+        agentName={agent?.name}
+        onSelectSession={handleSelectHistorySession}
+        onNewChat={handleStartNewChat}
+      />
     </SafeAreaView>
   );
 }
@@ -624,6 +688,39 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
   },
+  headerActionsGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  headerActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: 'rgba(212, 175, 55, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.25)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newChatHeaderBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: '#FFFFFF',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  newChatHeaderBtnText: {
+    color: '#000000',
+    fontSize: 11,
+    fontWeight: '700',
+  },
   counterBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -631,9 +728,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#161616',
     borderWidth: 1,
     borderColor: '#2A2A2A',
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 8,
   },
   counterText: {
     color: '#FFFFFF',

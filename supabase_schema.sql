@@ -51,9 +51,11 @@ CREATE TABLE IF NOT EXISTS public.agents (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 3. CONVERSATIONS TABLE
+-- 3. CONVERSATIONS TABLE (DISTINCT CHAT SESSIONS / CHAT_ID)
 CREATE TABLE IF NOT EXISTS public.conversations (
     id TEXT PRIMARY KEY,
+    chat_id TEXT, -- Unique chat session identifier
+    session_id TEXT, -- Alias for session identifier
     user_id TEXT NOT NULL,
     agent_id TEXT, -- NULL if 216 Supreme Council mode
     mode TEXT DEFAULT 'single_agent', -- 'single_agent', 'supreme_council_216'
@@ -63,10 +65,19 @@ CREATE TABLE IF NOT EXISTS public.conversations (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- 4. MESSAGES TABLE
+-- Ensure columns & indexes exist for backward compatibility
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS chat_id TEXT;
+ALTER TABLE public.conversations ADD COLUMN IF NOT EXISTS session_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_conversations_chat_id ON public.conversations(chat_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_user_agent ON public.conversations(user_id, agent_id);
+CREATE INDEX IF NOT EXISTS idx_conversations_updated_at ON public.conversations(updated_at DESC);
+
+-- 4. MESSAGES TABLE (100% CONTEXT RETENTION)
 CREATE TABLE IF NOT EXISTS public.messages (
     id TEXT PRIMARY KEY,
     conversation_id TEXT REFERENCES public.conversations(id) ON DELETE CASCADE,
+    chat_id TEXT, -- Direct link to active chat session (chat_id)
+    session_id TEXT, -- Alias for session identifier
     user_id TEXT NOT NULL,
     role TEXT NOT NULL, -- 'user', 'assistant', 'system'
     content TEXT NOT NULL,
@@ -76,6 +87,13 @@ CREATE TABLE IF NOT EXISTS public.messages (
     follow_up_questions JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Ensure columns & indexes exist for backward compatibility
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS chat_id TEXT;
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS session_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON public.messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON public.messages(conversation_id);
+CREATE INDEX IF NOT EXISTS idx_messages_created_at ON public.messages(created_at ASC);
 
 -- 5. RAZORPAY PAYMENTS & SUBSCRIPTIONS TABLE
 CREATE TABLE IF NOT EXISTS public.payments (

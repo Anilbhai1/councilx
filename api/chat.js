@@ -339,8 +339,31 @@ module.exports = async function handler(req, res) {
 
     const agent = body.agent || { name: 'Bhagwan Shri Krishna', title: 'Supreme Yogeshwara' };
     const userMessage = body.userMessage || body.message || body.prompt || (body.contents ? body.contents[body.contents.length - 1]?.parts?.[0]?.text : '') || (body.payload?.contents ? body.payload.contents[body.payload.contents.length - 1]?.parts?.[0]?.text : '');
-    const chatHistory = body.chatHistory || body.messages || [];
+    const chatId = body.chat_id || body.sessionId || body.session_id || body.conversation_id || body.id;
+    let chatHistory = body.chatHistory || body.messages || [];
     const language = body.language || 'gu';
+
+    // 0. Flawless Context Retention: Fetch full historical context of active chat_id from Supabase if not in request
+    if (chatId && (!Array.isArray(chatHistory) || chatHistory.length === 0)) {
+      try {
+        const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+        const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
+        if (supabaseUrl && supabaseKey) {
+          const { createClient } = require('@supabase/supabase-js');
+          const supabase = createClient(supabaseUrl, supabaseKey);
+          const { data: dbMsgs } = await supabase
+            .from('messages')
+            .select('role, content, created_at')
+            .or(`conversation_id.eq.${chatId},chat_id.eq.${chatId}`)
+            .order('created_at', { ascending: true });
+          if (dbMsgs && dbMsgs.length > 0) {
+            chatHistory = dbMsgs;
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('[Fetch DB History Notice]:', fetchErr.message);
+      }
+    }
 
     const geminiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
     const hasValidGeminiKey = Boolean(geminiKey && !geminiKey.includes('your_gemini_api_key') && !geminiKey.startsWith('AQ.'));
@@ -363,26 +386,52 @@ module.exports = async function handler(req, res) {
     // 2. Build Master System Prompt
     const dynamicSystemInstruction = buildMasterSystemPrompt(agent, language, liveSearchContext);
 
-    // 3. Attempt Live Gemini Call with Structured JSON mode
+    // 3. 100% Context Memory: Build full conversation array for Gemini with alternating roles
+    const geminiContents = [];
+    const validHistory = (chatHistory || []).filter(m => m && m.content && typeof m.content === 'string' && m.content.trim().length > 0);
+
+    for (const msg of validHistory) {
+      const isModel = msg.role === 'assistant' || msg.role === 'model';
+      const text = msg.content.trim();
+      if (geminiContents.length === 0 && isModel) {
+        // Prepend user starter turn so Gemini sequence always begins with user
+        geminiContents.push({ role: 'user', parts: [{ text: 'પ્રણામ. મારે આપનું માર્ગદર્શન જોઈએ છે.' }] });
+      }
+
+      if (geminiContents.length > 0 && geminiContents[geminiContents.length - 1].role === (isModel ? 'model' : 'user')) {
+        // Merge consecutive turns with identical role to keep alternating sequence valid
+        geminiContents[geminiContents.length - 1].parts[0].text += '\n\n' + text;
+      } else {
+        geminiContents.push({
+          role: isModel ? 'model' : 'user',
+          parts: [{ text }]
+        });
+      }
+    }
+
+    // Append latest user message if not already the final user turn
+    if (userMessage && userMessage.trim().length > 0) {
+      const lastTurn = geminiContents[geminiContents.length - 1];
+      if (!lastTurn || lastTurn.role !== 'user' || lastTurn.parts[0].text !== userMessage.trim()) {
+        if (lastTurn && lastTurn.role === 'user') {
+          lastTurn.parts[0].text += '\n\n' + userMessage.trim();
+        } else {
+          geminiContents.push({ role: 'user', parts: [{ text: userMessage.trim() }] });
+        }
+      }
+    }
+
+    if (geminiContents.length === 0) {
+      geminiContents.push({ role: 'user', parts: [{ text: userMessage || 'નમસ્તે' }] });
+    }
+
+    // 3a. Attempt Live Gemini Call with 100% Context Retention & Structured JSON mode
     if (hasValidGeminiKey) {
       for (const model of ALLOWED_GEMINI_MODELS) {
         try {
-          const contents = [];
-          (chatHistory || []).slice(-12).forEach(msg => {
-            if (msg.content) {
-              contents.push({
-                role: msg.role === 'assistant' ? 'model' : 'user',
-                parts: [{ text: msg.content }]
-              });
-            }
-          });
-          if (userMessage) {
-            contents.push({ role: 'user', parts: [{ text: userMessage }] });
-          }
-
           const payload = {
             system_instruction: { parts: [{ text: dynamicSystemInstruction }] },
-            contents,
+            contents: geminiContents,
             tools: [{ googleSearch: {} }],
             generationConfig: {
               temperature: 0.75,
@@ -410,6 +459,7 @@ module.exports = async function handler(req, res) {
                 follow_ups: result.follow_ups,
                 content: result.reply,
                 followUpQuestions: result.follow_ups,
+                chat_id: chatId,
                 candidates: [{
                   content: {
                     parts: [{ text: JSON.stringify({ reply: result.reply, follow_ups: result.follow_ups }) }]
@@ -425,18 +475,27 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3b. Attempt Groq API if configured
+    // 3b. Build 100% Context Memory for OpenAI / Groq
+    const fullConversationMessages = [
+      { role: 'system', content: dynamicSystemInstruction }
+    ];
+
+    for (const msg of validHistory) {
+      const isAssistant = msg.role === 'assistant' || msg.role === 'model';
+      fullConversationMessages.push({
+        role: isAssistant ? 'assistant' : 'user',
+        content: msg.content.trim()
+      });
+    }
+
+    const lastOai = fullConversationMessages[fullConversationMessages.length - 1];
+    if (userMessage && userMessage.trim().length > 0 && (!lastOai || lastOai.role !== 'user' || lastOai.content !== userMessage.trim())) {
+      fullConversationMessages.push({ role: 'user', content: userMessage.trim() });
+    }
+
+    // 3c. Attempt Groq API with 100% Context Retention
     if (groqKey) {
       try {
-        const groqMessages = [
-          { role: 'system', content: dynamicSystemInstruction },
-          ...(chatHistory || []).slice(-10).map(m => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.content || ''
-          })),
-          { role: 'user', content: userMessage || 'નમસ્તે' }
-        ];
-
         const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -445,7 +504,7 @@ module.exports = async function handler(req, res) {
           },
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
-            messages: groqMessages,
+            messages: fullConversationMessages,
             temperature: 0.75,
             max_tokens: 8192,
             response_format: { type: "json_object" }
@@ -463,6 +522,7 @@ module.exports = async function handler(req, res) {
               follow_ups: result.follow_ups,
               content: result.reply,
               followUpQuestions: result.follow_ups,
+              chat_id: chatId,
               model: 'groq/llama-3.3-70b'
             });
           }
@@ -472,18 +532,9 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // 3c. Attempt OpenAI API if configured
+    // 3d. Attempt OpenAI API with 100% Context Retention
     if (openaiKey) {
       try {
-        const oaiMessages = [
-          { role: 'system', content: dynamicSystemInstruction },
-          ...(chatHistory || []).slice(-10).map(m => ({
-            role: m.role === 'assistant' ? 'assistant' : 'user',
-            content: m.content || ''
-          })),
-          { role: 'user', content: userMessage || 'નમસ્તે' }
-        ];
-
         const oaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
           method: 'POST',
           headers: {
@@ -492,7 +543,7 @@ module.exports = async function handler(req, res) {
           },
           body: JSON.stringify({
             model: 'gpt-4o',
-            messages: oaiMessages,
+            messages: fullConversationMessages,
             temperature: 0.75,
             max_tokens: 8192,
             response_format: { type: "json_object" }
@@ -510,6 +561,7 @@ module.exports = async function handler(req, res) {
               follow_ups: result.follow_ups,
               content: result.reply,
               followUpQuestions: result.follow_ups,
+              chat_id: chatId,
               model: 'openai/gpt-4o'
             });
           }
@@ -527,6 +579,7 @@ module.exports = async function handler(req, res) {
       follow_ups: adaptiveResult.follow_ups,
       content: adaptiveResult.reply,
       followUpQuestions: adaptiveResult.follow_ups,
+      chat_id: chatId,
       mode: 'adaptive_storytelling_engine'
     });
   } catch (err) {

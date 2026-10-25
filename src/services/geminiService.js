@@ -173,11 +173,14 @@ export const geminiService = {
     agent,
     userMessage,
     chatHistory = [],
+    chat_id = null,
+    chatId = null,
     language = 'gu',
     modelType = 'flash',
     thinkingDepth = 'medium',
     isPremium = false
   }) {
+    const activeChatId = chat_id || chatId;
     // 1. Direct Master Agentic Backend (/api/chat) Call
     try {
       const endpoints = [
@@ -194,6 +197,8 @@ export const geminiService = {
               agent,
               userMessage,
               chatHistory,
+              messages: chatHistory,
+              chat_id: activeChatId,
               language,
               modelType,
               thinkingDepth,
@@ -352,29 +357,46 @@ ${JSON_SCHEMA_INSTRUCTION}
    * Chat History Ingestion
    */
   _buildChatContents(chatHistory = [], currentMessage = '') {
-    const contents = [];
+    const rawTurns = [];
     const sanitizedHistory = (chatHistory || [])
-      .filter(m => m && m.content && typeof m.content === 'string' && m.content.trim().length > 0)
-      .slice(-50);
+      .filter(m => m && m.content && typeof m.content === 'string' && m.content.trim().length > 0);
 
     for (const msg of sanitizedHistory) {
       if (msg.role === 'user' && msg.content.trim() === (currentMessage || '').trim()) {
         continue;
       }
-      contents.push({
-        role: msg.role === 'assistant' ? 'model' : 'user',
+      rawTurns.push({
+        role: (msg.role === 'assistant' || msg.role === 'model') ? 'model' : 'user',
         parts: [{ text: msg.content.trim() }]
       });
     }
 
     if (currentMessage && currentMessage.trim().length > 0) {
-      contents.push({
+      rawTurns.push({
         role: 'user',
         parts: [{ text: currentMessage.trim() }]
       });
     }
 
-    return contents.length > 0 ? contents : [{ role: 'user', parts: [{ text: currentMessage || 'Initiate counsel.' }] }];
+    // Ensure valid alternating roles for Gemini (user, model, user, model...)
+    const alternating = [];
+    for (const turn of rawTurns) {
+      if (alternating.length === 0) {
+        if (turn.role === 'model') {
+          alternating.push({ role: 'user', parts: [{ text: 'પ્રણામ. મારે આપનું માર્ગદર્શન જોઈએ છે.' }] });
+        }
+        alternating.push({ ...turn });
+      } else {
+        const prev = alternating[alternating.length - 1];
+        if (prev.role === turn.role) {
+          prev.parts[0].text += '\n\n' + turn.parts[0].text;
+        } else {
+          alternating.push({ ...turn });
+        }
+      }
+    }
+
+    return alternating.length > 0 ? alternating : [{ role: 'user', parts: [{ text: currentMessage || 'Initiate counsel.' }] }];
   },
 
   /**
