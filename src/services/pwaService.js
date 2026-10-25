@@ -32,20 +32,30 @@ class PWAService {
     this.registerServiceWorker();
 
     // 4. Capture native 'beforeinstallprompt' event (Chrome, Edge, Android Chrome, Brave)
-    window.addEventListener('beforeinstallprompt', (e) => {
-      // Prevent automatic browser mini-infobar
-      e.preventDefault();
-      this.deferredPrompt = e;
+    if (typeof window !== 'undefined' && window.__councilx_deferred_prompt) {
+      this.deferredPrompt = window.__councilx_deferred_prompt;
       this.notifyListeners();
-    });
+    }
+    if (typeof window !== 'undefined') {
+      window.__councilx_on_before_install = (e) => {
+        this.deferredPrompt = e;
+        this.notifyListeners();
+      };
+      window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent automatic browser mini-infobar
+        e.preventDefault();
+        this.deferredPrompt = e;
+        this.notifyListeners();
+      });
 
-    // 5. Listen for successful installation
-    window.addEventListener('appinstalled', () => {
-      this.installed = true;
-      this.deferredPrompt = null;
-      this.notifyListeners();
-      console.log('✅ CouncilX PWA installed successfully on device');
-    });
+      // 5. Listen for successful installation
+      window.addEventListener('appinstalled', () => {
+        this.installed = true;
+        this.deferredPrompt = null;
+        this.notifyListeners();
+        console.log('✅ CouncilX PWA installed successfully on device');
+      });
+    }
   }
 
   checkStandalone() {
@@ -63,6 +73,15 @@ class PWAService {
     const head = document.head || document.getElementsByTagName('head')[0];
     if (!head) return;
 
+    // 0. Enforce Viewport Meta Tag for 100% Mobile Responsiveness
+    let viewportMeta = document.querySelector('meta[name="viewport"]');
+    if (!viewportMeta) {
+      viewportMeta = document.createElement('meta');
+      viewportMeta.name = 'viewport';
+      head.appendChild(viewportMeta);
+    }
+    viewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no';
+
     // 1. <link rel="manifest" href="/manifest.json">
     if (!document.querySelector('link[rel="manifest"]')) {
       const manifestLink = document.createElement('link');
@@ -71,13 +90,14 @@ class PWAService {
       head.appendChild(manifestLink);
     }
 
-    // 2. <meta name="theme-color" content="#00F0FF">
-    if (!document.querySelector('meta[name="theme-color"]')) {
-      const themeMeta = document.createElement('meta');
+    // 2. <meta name="theme-color" content="#050505">
+    let themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (!themeMeta) {
+      themeMeta = document.createElement('meta');
       themeMeta.name = 'theme-color';
-      themeMeta.content = '#00F0FF';
       head.appendChild(themeMeta);
     }
+    themeMeta.content = '#050505';
 
     // 3. iOS Web App Capable
     if (!document.querySelector('meta[name="apple-mobile-web-app-capable"]')) {
@@ -107,7 +127,7 @@ class PWAService {
     if (!document.querySelector('link[rel="apple-touch-icon"]')) {
       const appleIcon = document.createElement('link');
       appleIcon.rel = 'apple-touch-icon';
-      appleIcon.href = '/assets/icon.png';
+      appleIcon.href = '/icon-192.png';
       head.appendChild(appleIcon);
     }
   }
@@ -115,7 +135,7 @@ class PWAService {
   registerServiceWorker() {
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
 
-    window.addEventListener('load', () => {
+    const doRegister = () => {
       navigator.serviceWorker
         .register('/sw.js')
         .then((reg) => {
@@ -124,7 +144,15 @@ class PWAService {
         .catch((err) => {
           console.warn('ℹ️ Service Worker registration notice:', err?.message || err);
         });
-    });
+    };
+
+    if (typeof document !== 'undefined') {
+      if (document.readyState === 'complete') {
+        doRegister();
+      } else {
+        window.addEventListener('load', doRegister);
+      }
+    }
   }
 
   isIOS() {

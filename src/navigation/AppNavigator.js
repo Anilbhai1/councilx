@@ -237,10 +237,14 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: '100%',
     backgroundColor: COLORS.pitchBlack,
+    overflow: 'hidden',
   },
   loadingBox: {
     flex: 1,
+    width: '100%',
     backgroundColor: COLORS.pitchBlack,
     justifyContent: 'center',
     alignItems: 'center',

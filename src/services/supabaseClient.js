@@ -65,9 +65,20 @@ export function getInitialAuthSync() {
         const raw = window.localStorage.getItem(COUNCILX_USER_SESSION_KEY);
         const legacy = window.localStorage.getItem('@councilx_is_logged_in');
         if (raw || legacy === 'true') return true;
+
+        // Inspect any active Supabase auth tokens in localStorage
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && ((key.startsWith('sb-') && key.endsWith('-auth-token')) || key === 'supabase.auth.token' || key.includes('auth-token'))) {
+            const item = window.localStorage.getItem(key);
+            if (item && (item.includes('access_token') || item.includes('user'))) {
+              return true;
+            }
+          }
+        }
       }
       if (typeof document !== 'undefined' && document.cookie) {
-        if (document.cookie.includes('councilx_session') || document.cookie.includes('councilx_logged_in=true')) {
+        if (document.cookie.includes('councilx_session') || document.cookie.includes('councilx_logged_in=true') || document.cookie.includes('sb-')) {
           return true;
         }
       }
@@ -149,6 +160,31 @@ export async function getLocalSession() {
           const lsProfile = window.localStorage.getItem('@councilx_user_profile');
           if (lsProfile) return JSON.parse(lsProfile);
         }
+
+        // Check for active Supabase auth tokens in localStorage
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && (((key.startsWith('sb-') && key.endsWith('-auth-token'))) || key === 'supabase.auth.token' || key.includes('auth-token'))) {
+            try {
+              const item = window.localStorage.getItem(key);
+              if (item) {
+                const parsed = JSON.parse(item);
+                const user = parsed.user || parsed.currentSession?.user;
+                if (user) {
+                  const restored = await saveLocalSession({
+                    user_id: user.id,
+                    email: user.email || 'member@councilx.ai',
+                    name: user.user_metadata?.full_name || user.user_metadata?.name || 'Council Member',
+                    avatar_url: user.user_metadata?.avatar_url,
+                    provider: 'google',
+                    isAuthenticated: true
+                  });
+                  return restored;
+                }
+              }
+            } catch (pErr) {}
+          }
+        }
       } catch (lsErr) {}
     }
 
@@ -212,10 +248,18 @@ export async function clearLocalSession() {
     // 1. Clear AsyncStorage
     await AsyncStorage.multiRemove(keysToRemove);
 
-    // 2. Clear window.localStorage on web
+    // 2. Clear window.localStorage on web (including all Supabase auth tokens)
     if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
       try {
         keysToRemove.forEach(k => window.localStorage.removeItem(k));
+        const sbKeys = [];
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key && (key.startsWith('sb-') || key.includes('auth-token') || key.includes('supabase'))) {
+            sbKeys.push(key);
+          }
+        }
+        sbKeys.forEach(k => window.localStorage.removeItem(k));
       } catch (e) {}
     }
 

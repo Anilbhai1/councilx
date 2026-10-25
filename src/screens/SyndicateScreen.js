@@ -730,6 +730,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
     backgroundColor: '#0A0A0A',
     borderTopWidth: 1,
     borderTopColor: '#1E1E1E',

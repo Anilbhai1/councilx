@@ -209,36 +209,7 @@ export default function AuthScreen({ onAuthSuccess }) {
     }
   };
 
-  const handleInstantAccess = async () => {
-    setLoading(true);
-    try {
-      if (referralInput.trim()) {
-        try {
-          await paymentService.redeemReferralCode(referralInput.trim());
-        } catch (e) {
-          console.warn('Referral redemption notice:', e?.message || e);
-        }
-      }
 
-      await saveLocalSession({
-        email: 'member@councilx.ai',
-        name: 'Sovereign Member',
-        avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&h=200&fit=crop&crop=faces',
-        provider: 'guest',
-        free_chats_remaining: 5,
-        extra_agent_slots: 0,
-        isAuthenticated: true
-      });
-
-      if (onAuthSuccess) {
-        onAuthSuccess();
-      }
-    } catch (e) {
-      console.warn('Instant access notice:', e?.message || e);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleApplyReferral = async () => {
     if (!referralInput.trim()) {
@@ -378,20 +349,7 @@ export default function AuthScreen({ onAuthSuccess }) {
           )}
         </TouchableOpacity>
 
-        {/* Instant Access Sovereign War Room / VIP Guest Access Button */}
-        <TouchableOpacity
-          style={[styles.instantAccessBtn, loading && styles.btnDisabled]}
-          onPress={handleInstantAccess}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="flash" size={18} color="#00F0FF" style={{ marginRight: 8 }} />
-          <View style={styles.ctaTextWrap}>
-            <Text style={styles.instantAccessBtnText}>ENTER SOVEREIGN WAR ROOM (INSTANT ACCESS)</Text>
-            <Text style={styles.instantAccessBtnSub}>NO LOGIN REQUIRED • 5 FREE SESSIONS READY</Text>
-          </View>
-          <Ionicons name="arrow-forward" size={16} color="#00F0FF" style={{ marginLeft: 8 }} />
-        </TouchableOpacity>
+
 
         {/* Promotional / Referral Code Box */}
         <View style={styles.referralContainer}>
@@ -767,40 +725,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '900',
     letterSpacing: 0.5,
-  },
-  instantAccessBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#111827',
-    borderWidth: 1.5,
-    borderColor: '#00F0FF',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    width: '100%',
-    marginTop: 12,
-    marginBottom: 4,
-    shadowColor: '#00F0FF',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 6,
-    elevation: 3,
-    ...(Platform.OS === 'web' ? { cursor: 'pointer', userSelect: 'none' } : {})
-  },
-  instantAccessBtnText: {
-    color: '#00F0FF',
-    fontSize: 12.5,
-    fontWeight: '900',
-    letterSpacing: 0.8,
-    textAlign: 'center',
-  },
-  instantAccessBtnSub: {
-    color: '#94A3B8',
-    fontSize: 9.5,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-    marginTop: 2,
-    textAlign: 'center',
   }
 });

@@ -196,14 +196,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingTop: 10,
+    paddingHorizontal: 12,
+    paddingTop: 8,
     paddingBottom: 8,
+    flexWrap: 'wrap',
+    gap: 6,
   },
   brandContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
+    gap: 8,
+    flexShrink: 1,
   },
   insigniaBox: {
     width: 32,
@@ -230,7 +233,9 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
+    flexShrink: 0,
+    flexWrap: 'wrap',
   },
   installAppBtn: {
     flexDirection: 'row',

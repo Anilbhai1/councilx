@@ -25,33 +25,43 @@ export const isSupabaseConfigured = () => {
 // Ensures session tokens survive browser tab closes, reloads, and long idle periods
 const persistentStorageAdapter = {
   getItem: (key) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      try {
-        const val = window.localStorage.getItem(key);
-        if (val !== null) return val;
-      } catch (e) {
-        console.warn('localStorage getItem warning:', e);
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          return window.localStorage.getItem(key);
+        } catch (e) {
+          console.warn('localStorage getItem warning:', e);
+        }
       }
+      return null;
     }
     return AsyncStorage.getItem(key);
   },
   setItem: (key, value) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      try {
-        window.localStorage.setItem(key, value);
-      } catch (e) {
-        console.warn('localStorage setItem warning:', e);
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.setItem(key, value);
+          return;
+        } catch (e) {
+          console.warn('localStorage setItem warning:', e);
+        }
       }
+      return;
     }
     return AsyncStorage.setItem(key, value);
   },
   removeItem: (key) => {
-    if (Platform.OS === 'web' && typeof window !== 'undefined' && window.localStorage) {
-      try {
-        window.localStorage.removeItem(key);
-      } catch (e) {
-        console.warn('localStorage removeItem warning:', e);
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        try {
+          window.localStorage.removeItem(key);
+          return;
+        } catch (e) {
+          console.warn('localStorage removeItem warning:', e);
+        }
       }
+      return;
     }
     return AsyncStorage.removeItem(key);
   }

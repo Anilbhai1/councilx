@@ -1153,7 +1153,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 10,
-    width: 260,
+    width: '100%',
+    maxWidth: 260,
     alignItems: 'center',
     marginBottom: 24
   },

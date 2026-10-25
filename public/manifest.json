@@ -4,9 +4,27 @@
   "description": "The World's 216 Greatest Minds in Your Private War Room. Civilizational Strategy, Dharmic Wisdom & Hyper-Scale Execution.",
   "icons": [
     {
-      "src": "/assets/icon.png",
+      "src": "/icon-192.png",
       "type": "image/png",
       "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
       "purpose": "any maskable"
     },
     {
@@ -17,6 +35,7 @@
     }
   ],
   "start_url": "/",
+  "id": "/",
   "background_color": "#050505",
   "theme_color": "#00F0FF",
   "display": "standalone",

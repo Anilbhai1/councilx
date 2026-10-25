@@ -4,12 +4,13 @@
  * Version: 1.0.0
  */
 
-const CACHE_NAME = 'councilx-pwa-v1';
+const CACHE_NAME = 'councilx-pwa-v2';
 const STATIC_ASSETS = [
   '/',
   '/manifest.json',
-  '/assets/icon.png',
-  '/assets/favicon.png'
+  '/icon-192.png',
+  '/icon-512.png',
+  '/assets/icon.png'
 ];
 
 // Install: Cache critical static shell

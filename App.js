@@ -99,7 +99,10 @@ export default function App() {
           try {
             const { data: { subscription } } = supabase.auth.onAuthStateChange(
               async (event, session) => {
-                if (event === 'SIGNED_IN' && session?.user) {
+                if (
+                  (event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') &&
+                  session?.user
+                ) {
                   const user = session.user;
                   const userId = user.id;
                   const email = user.email || 'member@councilx.ai';
@@ -181,6 +184,9 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    width: '100%',
+    maxWidth: '100%',
     backgroundColor: COLORS.pitchBlack,
+    overflow: 'hidden',
   },
 });
