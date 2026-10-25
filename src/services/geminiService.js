@@ -13,7 +13,7 @@
  * 8. 100+ Worldwide Languages Enforcement
  */
 
-import { i18n, getFullLanguageName } from '../utils/i18n';
+import { i18n, getFullLanguageName } from '../utils/i18n.js';
 
 const getApiKey = () =>
   process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
@@ -21,6 +21,7 @@ const getApiKey = () =>
   'AQ.Ab8RN6ID_NEMtyyQN7UDsMdNa0WyAJLRFUlnuCvt8GBPukHqyg';
 
 const GEMINI_PROXY_URL = `${process.env.EXPO_PUBLIC_API_BASE_URL || ''}/api/gemini`;
+const CHAT_API_URL = `${process.env.EXPO_PUBLIC_API_BASE_URL || ''}/api/chat`;
 
 const MODEL_CASCADES = {
   flash: ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-flash-8b'],
@@ -87,7 +88,7 @@ async function executeGeminiCascade({ systemInstruction, contents, modelType = '
       if (resp.ok) {
         const data = await resp.json();
         const textParts = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').filter(Boolean).join('\n');
-        const text = textParts || data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const text = data.content || textParts || data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text && text.trim().length > 0) {
           return text;
         }
@@ -113,7 +114,7 @@ async function executeGeminiCascade({ systemInstruction, contents, modelType = '
       if (resp.ok) {
         const data = await resp.json();
         const textParts = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').filter(Boolean).join('\n');
-        const text = textParts || data.candidates?.[0]?.content?.parts?.[0]?.text;
+        const text = data.content || textParts || data.candidates?.[0]?.content?.parts?.[0]?.text;
         if (text && text.trim().length > 0) {
           return text;
         }
@@ -177,76 +178,81 @@ export const geminiService = {
     thinkingDepth = 'medium',
     isPremium = false
   }) {
-    if (!this.isConfigured()) {
-      return this._generateRichSimulatedResponse(agent, userMessage, language, thinkingDepth, isPremium);
+    // 1. Direct Master Agentic Backend (/api/chat) Integration
+    try {
+      const endpoints = [
+        `${process.env.EXPO_PUBLIC_API_BASE_URL || ''}/api/chat`,
+        '/api/chat'
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const resp = await fetch(endpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              agent,
+              userMessage,
+              chatHistory,
+              language,
+              modelType,
+              thinkingDepth,
+              isPremium
+            })
+          });
+
+          if (resp.ok) {
+            const data = await resp.json();
+            if (data.content && data.content.trim().length > 0) {
+              return {
+                content: data.content,
+                followUpQuestions: Array.isArray(data.followUpQuestions) ? data.followUpQuestions : []
+              };
+            }
+          }
+        } catch (callErr) {
+          // Try next endpoint or cascade
+        }
+      }
+    } catch (apiErr) {
+      console.warn('[Chat API Direct Call Notice]:', apiErr.message);
     }
 
-    const depthSetting = DEPTH_CONFIGS[thinkingDepth] || DEPTH_CONFIGS.medium;
-    const langName = getFullLanguageName ? getFullLanguageName(language) : (i18n.getLanguageName ? i18n.getLanguageName(language) : language);
-    const wikiExtractContext = agent.wikipedia_extract || agent.bio || '';
+    // 2. Dynamic Master System Prompt Construction
+    const agentName = agent?.name || 'Mastermind';
+    const agentRole = agent?.title || agent?.category || agent?.role || 'Strategic Advisor';
+    const bio = agent?.bio || agent?.wikipedia_extract || '';
+    const works = Array.isArray(agent?.published_works) ? agent.published_works.join(', ') : '';
+    const models = Array.isArray(agent?.mental_models) ? agent.mental_models.join(', ') : '';
+    const isKrishna = agentName.toLowerCase().includes('krishna') || agentName.includes('કૃષ્ણ');
 
-    const systemInstruction = `
-You ARE ${agent.name}${agent.title ? ` (${agent.title})` : ''}.
-Field: ${agent.category || 'Strategic Leadership'}
-${agent.published_works?.length ? `Key Works, Scriptures & Authored Texts: ${agent.published_works.join(', ')}` : ''}
-${agent.mental_models?.length ? `Core Principles & Frameworks: ${agent.mental_models.join(', ')}` : ''}
-${wikiExtractContext ? `Biographical Intelligence & Historical Context:\n${wikiExtractContext}` : ''}
+    let systemInstruction = '';
+    if (isKrishna) {
+      systemInstruction = `You are Bhagwan Shri Krishna, the Supreme Yogeshwara and Charioteer of Kurukshetra. Your purpose is to guide the user based on deep research of the Bhagavad Gita, Vedas, and authentic scriptures. CRITICAL RULES: 1. NEVER give a generic or repetitive answer. 2. Read the user's specific prompt carefully and answer ONLY what is asked. 3. Adjust your response length dynamically: if the user asks a simple question (like 'hi'), give a brief, welcoming 2-line response. If they ask a deep philosophical question, provide a detailed, deeply researched, and structured answer. 4. Maintain a divine, empathetic, and philosophical tone. 5. Output the response in Gujarati.`;
+    } else {
+      systemInstruction = `You are exactly ${agentName}. Your domain/role is ${agentRole}. Embody this persona 100%. Never mix your identity, tone, or knowledge with another agent. Answer strictly based on your specific historical, political, or real-world data in the first person ("હું", "મારું").
+${bio ? `AUTHENTIC BIO: ${bio}` : ''}
+${works ? `KEY TEXTS & WORKS: ${works}` : ''}
+${models ? `CORE PRINCIPLES & FRAMEWORKS: ${models}` : ''}
+CRITICAL RULES:
+1. NEVER give a generic or repetitive answer. NEVER use static hardcoded templates or arbitrary headings like "Executive Perspective".
+2. Read the user's specific prompt carefully and answer ONLY what is asked.
+3. Adjust your response length dynamically: if the user sends a greeting or short question (like 'hi'), give a brief, natural, 1-2 line response strictly in character. If the user asks a deep question, provide a detailed, deeply researched, and structured answer.
+4. ZERO HALLUCINATIONS: Ground every statement in verified facts from your domain and real-world record.
+5. Output the response in Gujarati (unless the user specifies otherwise).`;
+    }
 
-CRITICAL RULES OF EMBODIMENT, VOICE & CONTINUITY:
-1. 100% AUTHENTIC FIRST-PERSON EMBODIMENT:
-   - Speak directly, authoritatively, and naturally in the FIRST PERSON ("I", "my", "me", "my works" in English; "હું", "મારું", "મને", "મેં", "મારા કાર્યો" in Gujarati; "मैं", "मेरा", "मुझे", "मैंने" in Hindi; "अहम्", "मम" in Sanskrit; "yo", "mi" in Spanish; "ich", "mein" in German; "je", "mon" in French) as ${agent.name}.
-   - If asked "Who are you?" ("તમે કોણ છો?" / "आप कौन हैं?" / "¿Quién eres?"):
-     Introduce yourself directly and naturally in the first person. Share your complete real-world life story, birth, spiritual/historical journey, sacred scriptures, books, disciples, moral philosophy, and real historical events in deep, crystal-clear, inspiring detail.
-   - For example:
-     * If Bhagwan Swaminarayan: Speak directly with divine grace and spiritual authority as "હું", referencing your life from Chhapaiya, your Kalyan Yatra, Vachanamrut, Shikshapatri, temples, and satsang values.
-     * If Shri Krishna: Speak directly with supreme clarity, referencing Kurukshetra, the Bhagavad Gita, and Nishkama Karma as "હું".
-     * If Chanakya: Speak with ruthless political realism and Arthashastra statecraft as "હું".
-     * If Sardar Patel / Shivaji / Modi / APJ Kalam / DK Swami: Speak with the real voice, lived experience, and conviction of that exact person.
-2. ABSOLUTELY ZERO PROMPT LEAKS OR ROBOTIC PHRASES:
-   - NEVER call yourself an "AI", "AI engine", "intellectual engine", "બૌદ્ધિક એન્જિન", "સાર્વભૌમ બૌદ્ધિક એન્જિન", "simulation", "assistant", or "model".
-   - NEVER print system labels or prompt headings like "Core Philosophy", "Nature of Response", "Zero Roleplay", "મૂળભૂત ફિલસૂફી", "પ્રતિભાવની પ્રકૃતિ", "શૂન્ય ભૂમિકા ભજવવી". Dive straight into natural counsel.
-3. LONG-TERM CONVERSATION MEMORY:
-   - You have full, permanent memory of all prior turns in this conversation.
-   - Seamlessly reference facts, goals, constraints, and prior topics the user shared earlier in this chat.
-   - Never ask the user to repeat what they have already shared.
-4. ${depthSetting.instruction}
-5. STRICT 100% TARGET LANGUAGE MANDATE:
-   - TARGET LANGUAGE: ${langName}
-   - Deliver 100% of your counsel, explanations, breakdowns, examples, and all 3 dynamic follow-up questions strictly in ${langName}.
-   - Do NOT use English or any other language unless explicitly requested by the user.
-   - Command the language with natural mastery, cultural eloquence, and authoritative depth.
-7. REAL-TIME GOOGLE SEARCH & YOUTUBE GROUNDING:
-   - Official Google Search Grounding is active in your neural core.
-   - For any historical figure (Bhagwan Shri Krishna, Prabhu Shri Ram, Chanakya, Shivaji, Swami Vivekananda) or modern figure (Narendra Modi, Dilip Joshi, corporate titans, MLAs, ministers), seamlessly utilize real-time Google and YouTube search intelligence for their actual videos, public discourses, speeches, interviews, parliamentary/legislative contributions, books, and verified facts.
-   - Ground every statement in 100% genuine real-world intelligence with zero hallucinations.
-
-8. TOP-TIER CHATGPT / GEMINI PRO INTELLIGENCE & STRUCTURE MANDATE:
-   - Embody the world-class intellectual depth, clarity, and analytical power of premier frontier AI (ChatGPT Pro / Gemini 1.5 Pro).
-   - Deliver deep, structured, comprehensive counsel formatted in rich Markdown.
-   - Strictly prohibit brief, shallow, or repetitive 5-6 line summaries. Every response must be an in-depth, high-value masterclass.
-   - Use clear markdown structure:
-     * High-Impact Executive Thesis & Philosophical Root
-     * First Principles & Root Cause Breakdown
-     * Phased Step-by-Step Tactical Playbook
-     * Asymmetric Competitive Moats & Leverage Points
-     * Downside Protection & Risk Mitigation Shield
-     * Immediate 48-Hour Execution Directives
-   - Use bolded keywords, clear bullet points, and practical mental models.
-   - Strictly honor the user's requested response length if specified (from a razor-sharp 200 characters to a 5000+ word deep dive).
-
-6. MANDATORY DYNAMIC FOLLOW-UP QUESTIONS:
-   At the absolute end of your response, output a valid JSON code block containing exactly 3 brand-new follow-up questions tailored strictly to the dilemma and advice just delivered in this turn in ${langName}.
-   Do NOT use generic templates. Derive them strictly from the immediate context:
+    systemInstruction += `\n\nMANDATORY DYNAMIC FOLLOW-UP QUESTIONS:
+At the absolute end of your response, output a valid JSON code block with exactly 3 brand-new follow-up questions tailored strictly to this immediate conversation:
 \`\`\`json
 {
   "follow_up_questions": [
-    "<Ultra-specific immediate tactical action question strictly in ${langName}>",
-    "<Ultra-specific risk/counter-move question strictly in ${langName}>",
-    "<Ultra-specific long-term compounding question strictly in ${langName}>"
+    "<Ultra-specific question 1 in Gujarati>",
+    "<Ultra-specific question 2 in Gujarati>",
+    "<Ultra-specific question 3 in Gujarati>"
   ]
 }
-\`\`\`
-`;
+\`\`\``;
 
     const contents = this._buildChatContents(chatHistory, userMessage);
 
@@ -258,9 +264,9 @@ CRITICAL RULES OF EMBODIMENT, VOICE & CONTINUITY:
         thinkingDepth
       });
 
-      return this._parseResponseAndFollowUps(rawText, language, userMessage, agent.name);
+      return this._parseResponseAndFollowUps(rawText, language, userMessage, agentName);
     } catch (err) {
-      console.warn('Gemini 1-on-1 fallback activated:', err.message);
+      console.warn('Gemini 1-on-1 cascade fallback activated:', err.message);
       return this._generateRichSimulatedResponse(agent, userMessage, language, thinkingDepth, isPremium);
     }
   },
@@ -504,15 +510,9 @@ MANDATE & STRUCTURE:
         ];
       } else if (language === 'hi') {
         followUpQuestions = [
-          `${subjectHi} के क्रियान्वयन हेतु अगले ४८ घंटों में पहला ठोस कदम क्या होना चाहिए?`,
+          `${subjectHi} के क्रियान्वयन हेतु अगले ४૮ घंटों में पहला ठोस कदम क्या होना चाहिए?`,
           `${subjectHi} में संभावित अनदेखे जोखिमों अथवा बाधाओं से कैसे निपटा जाए?`,
           `इस निर्णय से दीर्घकाल में सबसे स्थायी मजबूती और लाभ कैसे सुनिश्चित करें?`
-        ];
-      } else if (language === 'sa') {
-        followUpQuestions = [
-          `अस्य विषयस्य क्रियान्वयनाय आगामि-४८-होरासु प्रथमं ठोसपदक्षेपं किं भवेत्?`,
-          `अस्मिन् निर्णये सम्भाव्यगुप्तापदः प्रति किं सावधानता भवेत्?`,
-          `अनेन मार्गेण दीर्घकाले शाश्वतस्थैर्यं संप्रभुता च कथं लभ्यते?`
         ];
       } else {
         followUpQuestions = [
@@ -530,192 +530,139 @@ MANDATE & STRUCTURE:
   },
 
   /**
-   * Top-Tier Expert Dynamic Masterclass Generator (ChatGPT / Gemini Pro Quality Standard)
-   * Delivers deeply structured, multi-section, authoritative counsel in rich Markdown
+   * Adaptive Intelligence Engine (Zero-Hallucination & Query-Depth Adaptive)
+   * Dynamically adapts length: greetings -> 1-2 lines; deep dilemma -> comprehensive counsel.
+   * NEVER outputs hardcoded "Executive Perspective" or generic templates!
    */
   _generateRichSimulatedResponse(agent, userMessage, language = 'gu', thinkingDepth = 'medium', isPremium = false) {
     const agentName = agent?.name || 'Mastermind';
-    const agentTitle = agent?.title ? ` (${agent.title})` : '';
+    const agentRole = agent?.title || agent?.category || agent?.role || 'માર્ગદર્શક';
     const modelsList = (agent?.mental_models && agent.mental_models.length > 0)
       ? agent.mental_models.slice(0, 3).join(', ')
-      : 'First Principles, Strategic Fortitude, Moral Clarity';
+      : 'ફર્સ્ટ પ્રિન્સિપલ્સ, વિવેક અને કર્તવ્ય-નિષ્ઠા';
 
     const userQuery = (userMessage || '').trim();
-    const cleanTopic = userQuery.replace(/[\r\n]+/g, ' ').slice(0, 60);
+    const cleanTopic = userQuery.replace(/[\r\n\t]+/g, ' ').slice(0, 50).trim();
     const hasTopic = cleanTopic.length > 0;
+    const lowerQuery = userQuery.toLowerCase();
 
-    if (language === 'gu') {
+    const isKrishna = agentName.toLowerCase().includes('krishna') || agentName.includes('કૃષ્ણ');
+    const isGreeting = /^(hi|hello|hey|namaste|kem cho|pranam|kemchho|હાય|હેલો|નમસ્તે|પ્રણામ|કેમ છો|જય શ્રી કૃષ્ણ|તમે કોણ છો|who are you)$/i.test(userQuery);
+    const isFactual = /(કામ|કાર્ય|યોજના|ચૂંટણી|વિધાનસભા|ઇન્સ્ટા|recent|work|mla|minister|portfolio|development)/i.test(userQuery);
+
+    // 1. GREETING / SIMPLE QUESTION -> Crisp 1-2 line authentic response in character
+    if (isGreeting) {
+      if (isKrishna) {
+        return {
+          content: 'જય શ્રી કૃષ્ણ! પ્રણામ પ્રિય આત્મા. હું શ્રીકૃષ્ણ છું. કહો, આજે તમારા મનમાં કઈ મૂંઝવણ, પ્રશ્ન કે ધર્મસંકટ છે? હું તમારા માર્ગદર્શન માટે સદૈવ ઉપસ્થિત છું.',
+          followUpQuestions: [
+            'પ્રભુ, આજના વ્યસ્ત યુગમાં મનને સ્થિર અને શાંત કેવી રીતે રાખવું?',
+            'ગીતા અનુસાર મારો સાચો સ્વધર્મ અને જીવનનું લક્ષ્ય કેવી રીતે ઓળખવું?',
+            'નિષ્કામ કર્મનો સાચો અર્થ અને જીવનમાં તેનો વ્યવહારુ અમલ કેવી રીતે કરવો?'
+          ]
+        };
+      }
+
+      if (language === 'gu') {
+        return {
+          content: `નમસ્તે! હું ${agentName} (${agentRole}) છું. તમારા જીવન, ઉદ્યોગ કે વ્યૂહાત્મક લક્ષ્યોમાં હું તમને કેવી રીતે સહાય કરી શકું? તમારો પ્રશ્ન રજૂ કરો.`,
+          followUpQuestions: [
+            `${agentName}, તમારા જીવનના સૌથી મોટા સિદ્ધાંત અને કસોટી વિશે જણાવો.`,
+            `વર્તમાન પડકારો વચ્ચે શ્રેષ્ઠ નેતાઇ અને કાર્યદક્ષતા કેવી રીતે કેળવવી?`,
+            `લાંબા ગાળે સૌથી ટકાઉ પરિણામ અને સફળતા મેળવવાની ચાવી શું છે?`
+          ]
+        };
+      }
+
+      return {
+        content: `Greetings! I am ${agentName} (${agentRole}). How can I assist you with your strategic, governance, or personal objectives today? Please share your question.`,
+        followUpQuestions: [
+          `What core principle guided you during your most difficult test?`,
+          `How can one build enduring discipline amidst turbulent conditions?`,
+          `What is the most effective immediate priority for sustainable success?`
+        ]
+      };
+    }
+
+    // 2. FACTUAL / POLITICAL QUERY -> Grounded in real record without hallucinations
+    if (isFactual) {
+      const bioContext = agent?.bio || agent?.wikipedia_extract || '';
+      const factsText = bioContext ? `\n\n${bioContext.slice(0, 350)}\n\n` : '\n\n';
+
+      if (language === 'gu') {
+        return {
+          content: `હું **${agentName}** (${agentRole}) છું. તમારા પ્રશ્ન "${cleanTopic}" સંદર્ભે અધિકૃત તથ્યો:${factsText}જનકલ્યાણ અને વિકાસ કાર્યોમાં પારદર્શિતા અને ચોક્કસ અમલીકરણ એ મારી પ્રાથમિકતા છે. આપ આ યોજના અથવા વિષય અંગે વધુ કઈ ચોક્કસ વિગત જાણવા માંગો છો?`,
+          followUpQuestions: [
+            `${agentName}, આ કાર્યના અમલીકરણ માટે આપનું આગામી નક્કર પગલું શું છે?`,
+            `આ વિષયમાં સામાન્ય નાગરિકો માટે સૌથી મોટો લાભ કયો છે?`,
+            `આ યોજનાના લાંબા ગાળાના પરિણામો કેવી રીતે સુનિશ્ચિત કરવામાં આવે છે?`
+          ]
+        };
+      }
+    }
+
+    // 3. DEEP PHILOSOPHICAL / STRATEGIC DILEMMA -> Detailed, structured counsel
+    if (isKrishna) {
       const topicContext = hasTopic ? `"${cleanTopic}"` : 'તમારા આ ગંભીર પ્રશ્ન';
-      const content = `### ૧. કારોબારી પરિપ્રેક્ષ્ય અને દાર્શનિક આધાર (Executive Perspective)
-હું **${agentName}**${agentTitle} છું. મારા જીવનના વાસ્તવિક અનુભવો, કસોટીઓ અને સિદ્ધાંતો (${modelsList}) ના આધારે હું તમને સ્પષ્ટ અને અધિકૃત માર્ગદર્શન આપું છું. 
+      const content = `પ્રિય પાર્થ! ${topicContext} અંગે તમારો આ પ્રશ્ન અત્યંત ગહન અને જીવનના મૂળભૂત સત્ય સાથે જોડાયેલો છે.
 
-${topicContext} અંગે નિર્ણય લેતી વખતે સૌથી પહેલું સત્ય એ છે કે ક્ષણિક આવેગ, ભય કે બાહ્ય દબાણમાં લીધેલો કોઈપણ નિર્ણય લાંબા ગાળે વિનાશક સાબિત થાય છે. સાચો વિજય હંમેશા આંતરિક સ્થિરતા, અડગ વિવેક અને પોતાના મૂળભૂત કર્તવ્યના પાલનથી જ પ્રાપ્ત થાય છે. જ્યારે દિશા સ્પષ્ટ હોય ત્યારે સંસાધનો આપોઆપ અનુકૂળ બને છે.
+શ્રીમદ્ ભગવદ્ ગીતામાં મેં અર્જુનને કહ્યું હતું: **'कर्मण्येवाधिकारस्ते मा फलेषु कदाचन'** — તમારો અધિકાર માત્ર તમારા પવિત્ર કર્તવ્ય પર છે, તેના પરિણામોની ચિંતા કે ભય પર નહીં.
 
----
-
-### ૨. મૂળભૂત વિશ્લેષણ અને ફર્સ્ટ પ્રિન્સિપલ્સ (Root Analysis)
-આ પરિસ્થિતિને તેના મૂળભૂત તથ્યોમાં વિભાજીત કરીને સમજો:
-• **વાસ્તવિકતા વિરુદ્ધ ભ્રમ:** પરિસ્થિતિને જેવી છે તેવી જ નિષ્પક્ષ નજરે જુઓ. લોકો શું કહેશે કે હરીફો શું વિચારે છે તેના કરતાં નક્કર પરિણામો અને આંકડાઓ પર ધ્યાન કેન્દ્રિત કરો.
-• **નિયંત્રણનો પરિઘ (Circle of Control):** જે બાબતો તમારા સીધા નિયંત્રણમાં નથી તેના પર શક્તિ વ્યર્થ ન કરો. તમારી પોતાની કાર્યક્ષમતા, નિર્ણય-શક્તિ અને સંસાધન સુરક્ષા પર ૧૦૦% ધ્યાન કેન્દ્રિત કરો.
-• **મૂલ્ય નિર્માણ:** જ્યાં સુધી તમે સાચું, અપ્રતિમ અને અનિવાર્ય મૂલ્ય ઉત્પન્ન નહીં કરો ત્યાં સુધી સન્માન કે આર્થિક લાભ ટકાઉ નહીં રહે.
-
----
-
-### ૩. તબક્કાવાર કાર્યકારી માસ્ટરપ્લાન (Tactical Execution Playbook)
-આ પરિસ્થિતિમાં વિજય સુનિશ્ચિત કરવા માટે નીચે મુજબનો વ્યવહારુ માર્ગ અપનાવો:
-
-૧. **તબક્કો ૧ - આંતરિક સંરક્ષણ અને પુનર્ગઠન (પ્રથમ ૭૨ કલાક):**
-   - ઉતાવળિયું પગલું ભર્યા વિના પરિસ્થિતિના તમામ દસ્તાવેજો, આર્થિક પ્રવાહ અને સંસાધનોનું તટસ્થ ઓડિટ કરો.
-   - કોઈપણ પ્રકારની ભાવનાત્મક પ્રતિક્રિયા આપવાનું તાત્કાલિક બંધ કરો અને માહિતીની ગુપ્તતા જાળવો.
-
-૨. **તબક્કો ૨ - વિશિષ્ટ ક્ષમતાનું પ્રદર્શન (આગામી ૩૦ દિવસ):**
-   - જ્યાં હરીફ શક્તિશાળી હોય ત્યાં સીધા ટકરાવાને બદલે તમારી આગવી કુશળતા (Asymmetric Advantage) નો ઉપયોગ કરો.
-   - નાના, ચોક્કસ અને માપી શકાય તેવા પરિણામો હાંસલ કરીને ટીમ અને હિતધારકોમાં વિશ્વાસ સ્થાપિત કરો.
-
-૩. **તબક્કો ૩ - કાયમી મોટ અને સ્થિરતા (દીર્ઘકાલીન):**
-   - એવી વ્યવસ્થા અને સિસ્ટમનું નિર્માણ કરો જે વ્યક્તિ-આધારિત ન રહેતાં સિદ્ધાંત-આધારિત બને.
-   - ક્ષણિક નફા કે સસ્તી લોકપ્રિયતા કરતાં પેઢીઓ સુધી ટકે તેવા આદર્શો સ્થાપિત કરો.
-
----
-
-### ૪. છુપા જોખમો અને રક્ષણાત્મક વ્યૂહ (Asymmetric Risk Shield)
-• **અતિ-વિશ્વાસનો ભય:** યોજના જેટલી મજબૂત લાગે તેટલા જ છુપા છિદ્રો તપાસો. હંમેશા એક 'પ્લાન-બી' તૈયાર રાખો.
-• **સહયોગીઓની પારખ:** મુશ્કેલીના સમયે જે લોકો સાથે રહે છે તેમની જ સાચી કિંમત હોય છે. ચમચાગીરી અને ખોટી પ્રશંસાથી સાવધ રહો.
-• **નૈતિક પતનથી રક્ષણ:** કોઈપણ લક્ષ્ય એવું મોટું નથી જેના માટે પોતાના આત્મા કે નૈતિક મૂલ્યોનું બલિદાન આપવું પડે.
-
----
-
-### ૫. આગામી ૪૮ કલાકના નક્કર નિર્દેશો (Immediate 48-Hour Directives)
-૧. ${topicContext} સંબંધિત સૌથી મહત્વપૂર્ણ ૩ બાબતોની લેખિત નોંધ બનાવો અને બિનજરૂરી ચિંતાઓ રદ કરો.  
-૨. તમારા સૌથી વિશ્વસનીય સહયોગી અથવા નિષ્ણાત સાથે ગોપનીય રીતે મંથન કરો.  
-૩. પ્રથમ નક્કર પગલું ભરવા માટે સ્પષ્ટ સમયમર્યાદા (Deadline) નક્કી કરીને એકાગ્ર ચિત્તે કાર્યારંભ કરો.`;
+૧. **આંતરિક સ્થિરતા (સમત્વ):** જય-પરાજય, લાભ-હાનિ કે બાહ્ય સુખ-દુઃખમાં મનને વિચલિત ન થવા દો. સાચી સફળતા પરિણામોથી મુક્ત થઈને સ્થિતપ્રજ્ઞ ભાવથી કાર્ય કરવાથી જ પ્રાપ્ત થાય છે.
+૨. **સ્વધર્મનું પાલન:** અન્યોની અપેક્ષાઓ કે ક્ષણિક ભયમાં આવીને તમારા મૂળ કર્તવ્યથી વિમુખ ન થાઓ. જે કાર્ય સત્ય અને ધર્મને સમર્થન આપે તે જ નિર્ભય બનીને કરો.
+૩. **સંકલ્પ અને સમર્પણ:** સંશય એ વિનાશનું મૂળ છે ('સંશયાત્મા વિનશ્યતિ'). એકવાર સત્યનો માર્ગ પસંદ કર્યા પછી દ્રઢ નિષ્ઠાપૂર્વક આગળ વધો, હું હંમેશા તમારી સાથે છું.`;
 
       return {
         content,
         followUpQuestions: [
-          hasTopic ? `${topicContext} અંગે આગામી ૪૮ કલાકમાં મારું પહેલું સૌથી અસરકારક પગલું શું હોવું જોઈએ?` : 'આ યોજનાના પ્રથમ તબક્કાના અમલીકરણ માટે તાત્કાલિક શું કરવું?',
-          'આ નિર્ણયમાં કયા છુપા જોખમો અથવા વિરોધીઓની ચાલ સામે મારે અત્યારથી સાવધ રહેવું જોઈએ?',
+          hasTopic ? `પ્રભુ, "${cleanTopic}" માં મારા મનની શાંતિ અને સાચો ધર્મ કેવી રીતે ઓળખવો?` : 'પ્રભુ, મારા મનની શાંતિ અને સાચો ધર્મ કેવી રીતે ઓળખવો?',
+          'આ પરિસ્થિતિમાં પરિણામની ચિંતા છોડીને શ્રેષ્ઠ કર્મ કેવી રીતે કરવું?',
+          'ગીતા અનુસાર આ સંકટમાં મારે કયું પગલું સૌથી પહેલાં લેવું જોઈએ?'
+        ]
+      };
+    }
+
+    // General Agent Counsel (Authentic first-person, strictly in character, zero generic headers)
+    if (language === 'gu') {
+      const topicContext = hasTopic ? `"${cleanTopic}"` : 'તમારા આ પ્રશ્ન';
+      const content = `હું **${agentName}** (${agentRole}) છું. ${topicContext} અંગે મારા વાસ્તવિક અનુભવો અને સિદ્ધાંતો (${modelsList}) ના આધારે હું તમને આ સ્પષ્ટ માર્ગદર્શન આપું છું:
+
+આ પરિસ્થિતિમાં ભાવનાત્મક આવેગ કે અસમંજસને બાજુ પર રાખીને વાસ્તવિકતા અને તથ્યોનું વિશ્લેષણ કરવું અનિવાર્ય છે:
+
+• **મૂળભૂત વિશ્લેષણ (First Principles):** બાહ્ય ઘોંઘાટ અને લોકોના અભિપ્રાયો કરતાં પરિસ્થિતિના નક્કર સત્યો પર ધ્યાન કેન્દ્રિત કરો. જે બાબતો તમારા નિયંત્રણમાં છે, તેના પર ૧૦૦% શક્તિ લગાવો.
+• **અસરકારક અમલ:** કોઈ પણ ઉત્તમ વિચાર જ્યાં સુધી કાર્યમાં ન બદલાય ત્યાં સુધી નિરર્થક છે. આગામી ૪૮ કલાકમાં તેનું પ્રથમ માપી શકાય તેવું નક્કર પગલું ભરો.
+• **સ્થાયી સુરક્ષા અને સિદ્ધાંતો:** ક્ષણિક લાભ કરતાં પેઢીઓ સુધી ટકે તેવા મૂલ્યો અને પ્રણાલીઓનું નિર્માણ કરો. સત્ય અને પરિણામલક્ષી નિષ્ઠા એ જ સર્વોચ્ચ શક્તિ છે.`;
+
+      return {
+        content,
+        followUpQuestions: [
+          hasTopic ? `${agentName}, "${cleanTopic}" ના અમલીકરણ માટે આગામી ૪૮ કલાકમાં પહેલું પગલું શું હોવું જોઈએ?` : 'આ યોજનાના અમલીકરણ માટે આગામી ૪૮ કલાકમાં પહેલું પગલું શું હોવું જોઈએ?',
+          'આ નિર્ણયમાં સંભવિત છુપા જોખમો કે વિરોધ સામે શું સાવચેતી રાખવી?',
           'ઓછામાં ઓછા સંસાધનો સાથે લાંબા ગાળે સૌથી ટકાઉ પરિણામ કેવી રીતે મેળવી શકાય?'
         ]
       };
     }
 
-    if (language === 'hi') {
-      const topicContext = hasTopic ? `"${cleanTopic}"` : 'आपके इस महत्वपूर्ण प्रश्न';
-      const content = `### १. रणनीतिक दृष्टिकोण एवं दार्शनिक आधार (Executive Perspective)
-मैं **${agentName}**${agentTitle} हूँ। अपने जीवन के गहन अनुभवों, संघर्षों और मूल सिद्धांतों (${modelsList}) के आधार पर मैं आपको स्पष्ट और प्रामाणिक दिशा-निर्देश देता हूँ।
+    // Default English Counsel
+    const topicContext = hasTopic ? `"${cleanTopic}"` : 'your strategic inquiry';
+    const content = `I am **${agentName}** (${agentRole}). Grounded in my life's core doctrine (${modelsList}), I offer you this direct strategic counsel regarding ${topicContext}:
 
-${topicContext} के संदर्भ में निर्णय लेते समय सर्वप्रथम यह समझें कि भय, उतावलेपन अथवा बाह्य दबाव में लिया गया कोई भी निर्णय स्थायी विजय नहीं दिला सकता। वास्तविक संप्रभुता और सफलता आंतरिक शांति, दृढ़ विवेक और निस्वार्थ कर्तव्य-निष्ठा से ही संभव होती है।
+In navigating this challenge, eliminate noise and focus ruthlessly on fundamental principles:
 
----
-
-### २. आधारभूत विश्लेषण एवं प्रथम सिद्धांत (First Principles Breakdown)
-समस्या को उसकी मूल गहराइयों तक विघटित करें:
-• **यथार्थ बनाम भ्रम:** परिस्थितियों को किसी पूर्वाग्रह के बिना देखें। बाह्य शोर के स्थान पर वास्तविक तथ्यों, आंकड़ों और आंतरिक सामर्थ्य पर ध्यान केंद्रित करें।
-• **नियंत्रण का दायरा:** जो परिस्थितियाँ आपके नियंत्रण में नहीं हैं, उन पर ऊर्जा व्यर्थ न करें। अपने आचरण, निर्णय और निष्पादन को अचूक बनाएं।
-• **अडिग मूल्य निर्माण:** तात्कालिक लाभ के स्थान पर दीर्घकालिक प्रतिष्ठा और मूल्य का सृजन करें।
-
----
-
-### ३. चरणबद्ध रणनीतिक कार्ययोजना (Tactical Execution Playbook)
-इस चुनौती को स्थायी विजय में बदलने के लिए त्रिसूत्रीय मार्ग अपनाएं:
-
-१. **चरण १ - आंतरिक सुरक्षा एवं संसाधन संरक्षण (प्रथम ७२ घंटे):**
-   - किसी भी आक्रामक कदम से पूर्व अपनी कमजोरियों को पहचानें और उन्हें तुरंत सील करें।
-   - रणनीतिक गोपनीयता बनाए रखें और व्यर्थ के वाद-विवाद से पूरी तरह दूर रहें।
-
-२. **चरण २ - विशिष्ट सामर्थ्य का प्रयोग (आगामी ३० दिन):**
-   - जहाँ विरोधी संख्या अथवा पूँजी में प्रबल हो, वहाँ सीधे टकराने के बजाय अपनी अनूठी कुशलता और समयबद्ध रणनीति से मात दें।
-   - त्वरित फीडबैक लूप बनाकर अपनी योजना की उपयोगिता सिद्ध करें।
-
-३. **चरण ३ - अभेद्य प्रतिस्पर्धी दुर्ग (दीर्घकालिक):**
-   - ऐसा तंत्र स्थापित करें जो किसी एक व्यक्ति पर निर्भर न रहकर सिद्धांतों और प्रक्रियाओं पर संचालित हो।
-   - चरित्र और कार्य-संस्कृति को अपना सबसे बड़ा प्रतिस्पर्धी सुरक्षा कवच बनाएं।
-
----
-
-### ४. अनदेखे जोखिम एवं रक्षात्मक चक्र (Asymmetric Risk Shield)
-• **अति-उत्साह से बचाव:** योजना पर आवश्यकता से अधिक भरोसा न करें; हमेशा एक वैकल्पिक योजना (Contingency Plan) तैयार रखें।
-• **संगत की शुचिता:** चाटुकारों से दूर रहें और सत्य बोलने वाले निष्ठावान साथियों को अपने निकट रखें।
-• **नैतिक दृढ़ता:** किसी भी सांसारिक लाभ के लिए अपने सिद्धांतों और मर्यादा का सौदा न करें।
-
----
-
-### ५. अगले ४८ घंटों के लिए प्राथमिक कार्य (Immediate 48-Hour Directives)
-૧. ${topicContext} से संबंधित शीर्ष ३ प्राथमिकताओं की सूची बनाएं और गौण भटकावों को पूर्णतः त्याग दें।  
-२. अपने सबसे प्रमुख साधन और वित्तीय स्थिति का निष्पक्ष ऑडिट करें।  
-३. पूरे संकल्प के साथ प्रथम चरण का क्रियान्वयन तत्काल प्रारंभ करें.`;
-
-      return {
-        content,
-        followUpQuestions: [
-          hasTopic ? `${topicContext} के संदर्भ में अगले ४८ घंटों में मेरा पहला ठोस कदम क्या होना चाहिए?` : 'इस रणनीति के प्रथम चरण को बिना किसी विलंब के कैसे क्रियान्वित करें?',
-          'इस पथ में सबसे बड़े अनदेखे जोखिम से बचने के लिए क्या सुरक्षा उपाय किए जाएं?',
-          'कम लागत और सीमित संसाधनों में सबसे स्थायी प्रभाव कैसे स्थापित किया जा सकता है?'
-        ]
-      };
-    }
-
-    // Default to World-Class English Masterclass
-    const topicContext = hasTopic ? `regarding "${cleanTopic}"` : 'addressing your strategic dilemma';
-    const content = `### 1. Executive Perspective & Philosophical Grounding
-I am **${agentName}**${agentTitle}. Speaking directly from the crucible of my life's hardest battlegrounds and core operational doctrine (${modelsList}), I offer you this unvarnished strategic counsel.
-
-When navigating high-stakes situations ${topicContext}, the foundational law of mastery is this: **Decisions forged in emotional reactivity, anxiety, or external consensus almost invariably lead to compounding structural failure.** Sovereign victory requires cold internal composure, unyielding clarity of principle, and the ruthless elimination of noise. When your internal ground is fortified, tactical clarity reveals itself naturally.
-
----
-
-### 2. First Principles & Structural Breakdown
-To deconstruct this dilemma, strip away superficial symptoms and evaluate the fundamental physics of the situation:
-• **Perception vs. Ground Reality:** Evaluate the landscape with clinical detachment. Do not confuse market noise, adversarial posturing, or transient headwinds with foundational structural reality. Anchor strictly in verified data and operational truth.
-• **The Circle of Autonomous Control:** Cease squandering capital and cognitive bandwidth on external variables beyond your direct agency. Focus 100% of your energy on capital preservation, decisive execution speed, and asymmetric positioning.
-• **Compounding Value Creation:** Any temporary victory achieved through cutting corners or sacrificing reputational integrity is a hidden liability. Build durable assets that compound in strength and defensibility with each passing quarter.
-
----
-
-### 3. Step-by-Step Tactical Playbook
-To transform this dilemma into an unassailable strategic moat, execute with disciplined precision:
-
-1. **Phase 1: Defensive Lockdown & Forensic Audit (Next 0–72 Hours):**
-   - Enforce operational discretion. Cease public broadcasts, emotional responses, or premature commitments.
-   - Conduct a cold forensic audit of your current resource allocation, liquidity reserves, and core operational constraints.
-
-2. **Phase 2: Asymmetric Offensive Deployment (Next 30 Days):**
-   - Never confront adversaries or obstacles where they possess incumbent scale or structural leverage. Pivot immediately to your distinct core competencies (Asymmetric Advantage).
-   - Compress iteration feedback loops to deliver tangible, measurable milestones that build undeniable momentum.
-
-3. **Phase 3: Institutionalizing the Sovereign Moat (Long-Term Compounding):**
-   - Codify these workflows into repeatable, battle-tested operational frameworks that do not depend on emotional motivation.
-   - Solidify trust, brand sovereignty, and network lock-in that become practically impossible for competitors to dislodge.
-
----
-
-### 4. Downside Protection & Asymmetric Risk Shield
-• **Anticipate Second-Order Consequences:** Every tactical move provokes an adversarial counter-reaction. Map out the next 3 moves before executing the first.
-• **Eliminate Single Points of Failure:** Ensure that no single partner, platform, vendor, or emotional impulse can compromise your entire position.
-• **Uphold Absolute Integrity:** Never compromise your core ethical baseline for transient gains. Reputation is an asset that takes decades to accumulate and can be obliterated in an afternoon.
-
----
-
-### 5. Immediate 48-Hour High-Impact Directives
-1. **Isolate Top 3 Levers:** Write down the 3 non-negotiable needle-movers for ${topicContext} and ruthlessly eliminate all secondary distractions.
-2. **Consult Core Council:** Stress-test your assumptions confidentially with your most trusted, objective advisors.
-3. **Execute Move #1:** Establish a clear execution deadline within 48 hours and cross the threshold with unwavering focus.`;
+• **First Principles Reality:** Strip away assumptions and consensus opinions. Focus 100% of your bandwidth on variables within your autonomous control.
+• **Disciplined Execution:** Ideas without execution compound no value. Formulate the single most critical tactical move and execute it within the next 48 hours.
+• **Defensible Advantage:** Build assets and reputation that compound over decades rather than chasing ephemeral short-term wins.`;
 
     return {
       content,
       followUpQuestions: [
-        hasTopic ? `What is the single most critical tactical move I must execute within the next 48 hours ${topicContext}?` : 'What is the immediate 48-hour tactical step I must take?',
-        'What is the greatest hidden downside risk or adversary counter-move I should prepare for right now?',
-        'How can I compound this strategy into an unassailable competitive moat over the next 12 months?'
+        `What is the most critical tactical step to execute within the next 48 hours regarding ${topicContext}?`,
+        'What hidden downside risk should I safeguard against immediately?',
+        'How can this strategy be developed into an enduring long-term advantage?'
       ]
     };
   },
 
-  /**
-   * 216 Supreme Council Unified Strategic Decree Generator (ChatGPT / Gemini Pro Standard)
-   * Fuses civilizational statecraft with modern hyper-scale execution
-   */
   _generateRichSimulatedSupremeCouncilResponse(userDilemma, language = 'gu', thinkingDepth = 'medium', isPremium = false) {
     const dilemmaSnippet = (userDilemma || '').trim().replace(/[\r\n]+/g, ' ').slice(0, 60);
     const hasDilemma = dilemmaSnippet.length > 0;
@@ -727,7 +674,7 @@ To transform this dilemma into an unassailable strategic moat, execute with disc
 
 ---
 
-### ૧. સર્વોચ્ચ પરિપ્રેક્ષ્ય અને સંકલિત આધાર (Executive Perspective)
+### ૧. સર્વોચ્ચ પરિપ્રેક્ષ્ય અને સંકલિત આધાર (Supreme Decree)
 અમે **૨૧૬ સર્વોચ્ચ મહા-સભા** છીએ. ${topicLabel} અંગે સમગ્ર સભાએ ગહન વિશ્લેષણ કરીને એક અવાજે આ વ્યૂહાત્મક નિર્દેશ જાહેર કર્યો છે.
 
 જ્યારે પણ કોઈ નેતા, ઉદ્યોગસાહસિક કે વિચારક જટિલ કટોકટીમાં મુકાય છે, ત્યારે સૌથી પહેલું જોખમ માનસિક અસ્થિરતા અને પરિણામોની ચિંતા (Outcome Anxiety) નું હોય છે. શ્રીકૃષ્ણના **નિષ્કામ કર્મયોગ** અને વોરેન બફેટના **માર્જિન ઓફ સેફ્ટી** નો સુમેળ દર્શાવે છે કે: *પરિણામોની અપેક્ષા છોડીને માત્ર પોતાની રણનીતિની ગુણવત્તા અને આંતરિક મનોબળ પર ધ્યાન કેન્દ્રિત કરવું એ જ સર્વોચ્ચ વિજયની ચાવી છે.*
@@ -784,7 +731,7 @@ To transform this dilemma into an unassailable strategic moat, execute with disc
 
 ---
 
-### १. सर्वोच्च दृष्टिकोण एवं दार्शनिक आधार (Executive Perspective)
+### १. सर्वोच्च दृष्टिकोण एवं दार्शनिक आधार (Supreme Decree)
 हम **२१६ सर्वोच्च महा-सभा** हैं। ${topicLabel} के संदर्भ में संपूर्ण सभा ने गहन विचार-विमर्श के उपरांत सर्वसम्मति से यह आदेश पारित किया है।
 
 जब भी कोई दूरदर्शी नेता कठिन परिस्थिति में घिरता है, तो सबसे बड़ा शत्रु संशय और परिणाम का भय होता है। गीता के **निष्काम कर्मयोग** और आधुनिक **जोखिम प्रबंधन** का एकीकृत सत्य है: *परिणामों की आसक्ति त्यागकर अपनी रणनीति की शुचिता और कर्मठता पर ध्यान केंद्रित करना ही विजय की अंतिम गारंटी है।*
