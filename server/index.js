@@ -34,6 +34,8 @@ if (fs.existsSync(envPath)) {
 
 const createOrderHandler = require('../api/create-order');
 const verifyPaymentHandler = require('../api/verify-payment');
+const createSubscriptionHandler = require('../api/create-subscription');
+const verifySubscriptionHandler = require('../api/verify-subscription');
 const chatHandler = require('../api/chat');
 
 const PORT = process.env.PORT || 3001;
@@ -89,6 +91,18 @@ const server = http.createServer((req, res) => {
     } else if (url === '/api/verify-payment') {
       try {
         await verifyPaymentHandler(req, res);
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    } else if (url === '/api/create-subscription') {
+      try {
+        await createSubscriptionHandler(req, res);
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    } else if (url === '/api/verify-subscription') {
+      try {
+        await verifySubscriptionHandler(req, res);
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }

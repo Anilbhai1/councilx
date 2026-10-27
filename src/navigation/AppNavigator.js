@@ -21,6 +21,7 @@ import LegalComplianceScreen from '../screens/LegalComplianceScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
 import PricingScreen from '../screens/PricingScreen';
 import PremiumSuccessScreen from '../screens/PremiumSuccessScreen';
+import OracleOfWealthScreen from '../screens/OracleOfWealthScreen';
 import { COLORS } from '../theme/colors';
 import { getLocalSession, clearLocalSession, getInitialAuthSync } from '../services/supabaseClient';
 import { adminService, isSovereignEmail, SOVEREIGN_ADMIN_EMAIL } from '../services/adminService';
@@ -79,6 +80,17 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
         ) {
           setCurrentScreen('Pricing');
         } else if (
+          path === '/oracle' ||
+          path.startsWith('/oracle') ||
+          path === '/wealth' ||
+          path.startsWith('/wealth') ||
+          path === '/stock-market' ||
+          path.startsWith('/stock-market') ||
+          search.includes('oracle') ||
+          hash.includes('oracle')
+        ) {
+          setCurrentScreen('Oracle');
+        } else if (
           path === '/success' ||
           path.startsWith('/success') ||
           path === '/premium-success' ||
@@ -108,6 +120,12 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
       window.__councilx_open_pricing = () => {
         setCurrentScreen('Pricing');
         window.history.pushState(null, '', '/pricing');
+      };
+
+      window.__councilx_open_oracle = (params = {}) => {
+        setScreenParams(params);
+        setCurrentScreen('Oracle');
+        window.history.pushState(null, '', '/oracle');
       };
 
       window.__councilx_open_success = (params = {}) => {
@@ -169,6 +187,8 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
           window.history.pushState(null, '', '/admin');
         } else if (screenName === 'Pricing') {
           window.history.pushState(null, '', '/pricing');
+        } else if (screenName === 'Oracle') {
+          window.history.pushState(null, '', '/oracle');
         } else if (screenName === 'PremiumSuccess') {
           window.history.pushState(null, '', '/success');
         } else if (screenName === 'Home') {
@@ -222,6 +242,15 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     );
   }
 
+  // Dedicated Oracle of Wealth Screen: Accessible directly or via /oracle route
+  if (currentScreen === 'Oracle') {
+    return (
+      <View style={styles.container}>
+        <OracleOfWealthScreen route={{ params: screenParams }} navigation={navigation} />
+      </View>
+    );
+  }
+
   // Dedicated Premium Success Screen: Accessible after payment or via /success route
   if (currentScreen === 'PremiumSuccess') {
     return (
@@ -257,6 +286,8 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
         return <PremiumSuccessScreen route={{ params: screenParams }} navigation={navigation} />;
       case 'Pricing':
         return <PricingScreen route={{ params: screenParams }} navigation={navigation} />;
+      case 'Oracle':
+        return <OracleOfWealthScreen route={{ params: screenParams }} navigation={navigation} />;
       case 'Admin':
         return <AdminDashboardScreen navigation={navigation} />;
       case 'Auth':

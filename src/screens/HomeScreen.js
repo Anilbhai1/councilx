@@ -179,6 +179,33 @@ export default function HomeScreen({ navigation }) {
   // rendered inside FlatList ListHeaderComponent for full-page smooth scrolling!
   const renderDirectoryHeader = () => (
     <View style={styles.directoryHeaderContainer}>
+      {/* Oracle of Wealth: Stock Market Intelligence Engine */}
+      <View style={styles.oracleBannerWrap}>
+        <TouchableOpacity
+          style={styles.oracleBanner}
+          onPress={() => navigation.navigate('Oracle')}
+          activeOpacity={0.88}
+        >
+          <View style={styles.bannerLeft}>
+            <View style={styles.oracleBannerIconCircle}>
+              <Ionicons name="trending-up" size={17} color="#0A0A0A" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Text style={styles.oracleBannerTitle}>ORACLE OF WEALTH</Text>
+                <View style={styles.oracleBannerBadge}>
+                  <Text style={styles.oracleBannerBadgeText}>216 INTELLIGENCE</Text>
+                </View>
+              </View>
+              <Text style={styles.oracleBannerSub} numberOfLines={1}>
+                8 Interactive Cinematic Modules • IPO X-Ray, F&O Whale, Doomsday Stress Test
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={17} color="#D4AF37" />
+        </TouchableOpacity>
+      </View>
+
       {/* Quick Action: Create Personal Thinker Banner */}
       <View style={styles.quickCreateBannerWrap}>
         <TouchableOpacity
@@ -279,6 +306,7 @@ export default function HomeScreen({ navigation }) {
           isPremium={userStatus.isPremium}
           remainingFree={userStatus.remainingFree}
           onOpenSupremeCouncil={() => navigation.navigate('Syndicate')}
+          onOpenOracle={() => navigation.navigate('Oracle')}
           onOpenReferral={() => setReferralModalVisible(true)}
           onOpenPricing={() => navigation.navigate('Pricing')}
           onOpenPaywall={() => navigation.navigate('Pricing')}
@@ -593,8 +621,62 @@ const styles = StyleSheet.create({
   directoryHeaderContainer: {
     paddingBottom: 6,
   },
-  quickCreateBannerWrap: {
+  oracleBannerWrap: {
     paddingTop: 10,
+    paddingBottom: 2,
+  },
+  oracleBanner: {
+    backgroundColor: '#0F0E0A',
+    borderWidth: 1,
+    borderColor: '#3D3415',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  oracleBannerIconCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#D4AF37',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  oracleBannerTitle: {
+    color: '#D4AF37',
+    fontSize: 13,
+    fontWeight: '900',
+    letterSpacing: 0.8,
+  },
+  oracleBannerBadge: {
+    backgroundColor: '#1E1908',
+    borderColor: '#69551C',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  oracleBannerBadgeText: {
+    color: '#F5E0A0',
+    fontSize: 8.5,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  oracleBannerSub: {
+    color: '#B0A894',
+    fontSize: 10.5,
+    marginTop: 3,
+    lineHeight: 14,
+  },
+  quickCreateBannerWrap: {
+    paddingTop: 8,
     paddingBottom: 6
   },
   quickCreateBanner: {

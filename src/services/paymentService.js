@@ -80,6 +80,50 @@ export const PRICING_TIERS = {
   }
 };
 
+/**
+ * Oracle of Wealth - Razorpay Subscriptions API Plans
+ * Strict recurring subscriptions for the 8 Master Features & 216 Masterminds
+ */
+export const ORACLE_SUBSCRIPTION_PLANS = {
+  MARKET_MASTER: {
+    id: 'MARKET_MASTER',
+    name: 'Market Master',
+    tagline: '8 Master Wealth Engines & Interactive Follow-up Intelligence',
+    price: 999,
+    priceINR: 999,
+    period: 'monthly',
+    tag: '⚡ POPULAR TRADER CHOICE',
+    features: [
+      'PreMarketProphecy: Daily Global Trends & Opening Gameplan',
+      'SyndicateXRay: IPO GMP Traps & Balance Sheet Forensic Scan',
+      'FODeathmatch: Options Open Interest, Max Pain & Whale Flow',
+      'DoomsdaySimulator: Portfolio Crash & Liquidity Stress Test',
+      'KarmicFutureScanner: 5-Year Megatrends & Ethical Moats',
+      'CEOInterrogator: Earnings Call Forensic Reality Checks',
+      'RedemptionEngine: Curing FOMO with Deep-Value Alternatives',
+      'Interactive Appended Chat UI directly below every report',
+      'Razorpay Subscriptions API recurring auto-renewal (₹999/mo)'
+    ]
+  },
+  SOVEREIGN_SYNDICATE: {
+    id: 'SOVEREIGN_SYNDICATE',
+    name: 'Sovereign Syndicate',
+    tagline: 'All-Access 216 Masterminds + Shadow Dossier Unlocked',
+    price: 2499,
+    priceINR: 2499,
+    period: 'monthly',
+    tag: '👑 ELITE BILLIONAIRE SUITE',
+    features: [
+      'Everything in Market Master included',
+      'ShadowDossier: Instant Access to Dark Pool & Block Deal Reports',
+      'All 216 Supreme Masterminds & Multi-Agent Roundtables',
+      'Unlimited Personal Custom Masterminds & Persona Cloning',
+      '24/7 Sovereign Concierge & Priority Institutional Line',
+      'Razorpay Subscriptions API recurring auto-renewal (₹2,499/mo)'
+    ]
+  }
+};
+
 export const SUBSCRIPTION_PLANS = {
   BHARAT_108: {
     id: '108_bharat',
@@ -1410,6 +1454,200 @@ export const paymentService = {
       amount,
       isAnnual
     });
+  },
+
+  /**
+   * Razorpay Subscriptions API Integration for Oracle of Wealth
+   * Generates recurring subscription via /api/create-subscription
+   */
+  async createRazorpaySubscription({ planTier = 'MARKET_MASTER', userEmail = '', userPhone = '' } = {}) {
+    const keyId = this.getRazorpayKey();
+    const userId = await this.getUserId();
+
+    let baseUrl = '';
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        baseUrl = 'http://localhost:3001';
+      } else {
+        baseUrl = window.location.origin;
+      }
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.fetch) {
+        let res;
+        try {
+          res = await window.fetch(`${baseUrl}/api/create-subscription`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              planTier,
+              userId,
+              userEmail,
+              userPhone
+            })
+          });
+        } catch (fetchErr) {
+          res = await window.fetch('/api/create-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              planTier,
+              userId,
+              userEmail,
+              userPhone
+            })
+          });
+        }
+
+        const data = await res.json();
+        if (res.ok && data && (data.subscription_id || data.id)) {
+          return {
+            success: true,
+            subscription_id: data.subscription_id || data.id,
+            id: data.subscription_id || data.id,
+            plan_id: data.plan_id,
+            amount: data.amount,
+            key_id: keyId,
+            isOrderFallback: Boolean(data.isOrderFallback)
+          };
+        } else {
+          return {
+            success: false,
+            error: data?.error || 'Failed to initialize Razorpay subscription.'
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('[CouncilX Subscriptions API Error]:', err.message);
+      return {
+        success: false,
+        error: 'Unable to reach subscription gateway. Please ensure the backend server is active.'
+      };
+    }
+
+    return {
+      success: false,
+      error: 'Current environment does not support network requests.'
+    };
+  },
+
+  /**
+   * Verify Razorpay Recurring Subscription Signature via /api/verify-subscription
+   */
+  async verifyRazorpaySubscription({
+    razorpay_payment_id,
+    razorpay_subscription_id,
+    razorpay_order_id,
+    razorpay_signature,
+    planTier = 'MARKET_MASTER'
+  } = {}) {
+    const userId = await this.getUserId();
+
+    let baseUrl = '';
+    if (typeof window !== 'undefined') {
+      if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        baseUrl = 'http://localhost:3001';
+      } else {
+        baseUrl = window.location.origin;
+      }
+    }
+
+    try {
+      if (typeof window !== 'undefined' && window.fetch) {
+        let res;
+        try {
+          res = await window.fetch(`${baseUrl}/api/verify-subscription`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_payment_id,
+              razorpay_subscription_id,
+              razorpay_order_id,
+              razorpay_signature,
+              plan_id: planTier,
+              user_id: userId
+            })
+          });
+        } catch (fetchErr) {
+          res = await window.fetch('/api/verify-subscription', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              razorpay_payment_id,
+              razorpay_subscription_id,
+              razorpay_order_id,
+              razorpay_signature,
+              plan_id: planTier,
+              user_id: userId
+            })
+          });
+        }
+
+        const data = await res.json();
+        if (res.ok && (data?.verified || data?.success)) {
+          // Upgrade user status locally and set plan
+          const days = 30;
+          const expiresAt = new Date();
+          expiresAt.setDate(expiresAt.getDate() + days);
+
+          await Promise.all([
+            AsyncStorage.setItem('@councilx_is_premium', 'true'),
+            AsyncStorage.setItem('@councilx_plan_type', planTier),
+            AsyncStorage.setItem('@councilx_activated_at', new Date().toISOString()),
+            AsyncStorage.setItem('@councilx_expires_at', expiresAt.toISOString())
+          ]);
+
+          return {
+            success: true,
+            verified: true,
+            planTier,
+            expiresAt: expiresAt.toISOString()
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('[CouncilX Subscription Verify Notice]:', err.message);
+    }
+
+    return {
+      success: false,
+      error: 'Subscription verification failed.'
+    };
+  },
+
+  /**
+   * Shadow Dossier Referral Unlock Tracking (Unlocks via 3 successful referrals or Sovereign plan)
+   */
+  async getShadowDossierStatus() {
+    try {
+      const status = await this.getUserStatus();
+      if (status.isPremium && (status.planType === 'SOVEREIGN_SYNDICATE' || status.planType === '216_syndicate')) {
+        return { isUnlocked: true, referralCount: 3, requiredCount: 3, reason: 'sovereign_subscription' };
+      }
+
+      const storedCount = await AsyncStorage.getItem('@councilx_shadow_referrals_count');
+      const count = Number(storedCount) || 0;
+
+      if (count >= 3) {
+        return { isUnlocked: true, referralCount: count, requiredCount: 3, reason: 'referrals' };
+      }
+
+      return { isUnlocked: false, referralCount: count, requiredCount: 3, reason: 'locked' };
+    } catch (e) {
+      return { isUnlocked: false, referralCount: 0, requiredCount: 3, reason: 'locked' };
+    }
+  },
+
+  async addShadowDossierReferral() {
+    try {
+      const current = await this.getShadowDossierStatus();
+      const newCount = Math.min(3, current.referralCount + 1);
+      await AsyncStorage.setItem('@councilx_shadow_referrals_count', String(newCount));
+      return newCount;
+    } catch (e) {
+      return 0;
+    }
   }
 };
 

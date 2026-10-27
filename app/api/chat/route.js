@@ -101,24 +101,50 @@ function getApiKeys(request = null, body = {}) {
 /**
  * 1. AGENTIC REAL-TIME RAG: PERSONA-ALIGNED LIVE SEARCH ENGINE
  */
-async function performAgenticWebSearch(userQuery = '', agent = {}, tavilyKey = '') {
+async function performAgenticWebSearch(userQuery = '', agent = {}, tavilyKey = '', feature = '') {
   const agentName = agent.name || 'Mastermind';
   const role = agent.title || agent.category || agent.role || '';
   const cleanQuery = (userQuery || '').trim();
 
-  const isKrishna = agentName.toLowerCase().includes('krishna') || agentName.includes('કૃષ્ણ');
-  const isChanakya = agentName.toLowerCase().includes('chanakya') || agentName.includes('ચાણક્ય');
-  const isElon = agentName.toLowerCase().includes('elon') || agentName.includes('મસ્ક');
-
   let searchQuery = '';
-  if (isKrishna) {
-    searchQuery = `Bhagwan Shri Krishna Shrimad Bhagavad Gita Kurukshetra Dharma ${cleanQuery}`.slice(0, 140);
-  } else if (isChanakya) {
-    searchQuery = `Chanakya Kautilya Arthashastra Neeti statecraft ${cleanQuery}`.slice(0, 140);
-  } else if (isElon) {
-    searchQuery = `Elon Musk Tesla SpaceX xAI Neuralink ${cleanQuery} news business`.slice(0, 140);
+
+  // Feature-specific intelligent search formulations for Oracle of Wealth
+  if (feature === 'pre_market' || feature === 'PreMarketProphecy') {
+    searchQuery = `GIFT Nifty Indian stock market Asian markets crude oil FII DII global cues ${cleanQuery}`.slice(0, 140);
+  } else if (feature === 'syndicate_xray' || feature === 'SyndicateXRay') {
+    searchQuery = `${cleanQuery} IPO GMP subscription valuation financials promoter holding balance sheet`.slice(0, 140);
+  } else if (feature === 'fo_deathmatch' || feature === 'FODeathmatch') {
+    searchQuery = `${cleanQuery} option chain open interest PCR max pain call put strike whale buildup`.slice(0, 140);
+  } else if (feature === 'doomsday' || feature === 'DoomsdaySimulator') {
+    searchQuery = `${cleanQuery} market crash crisis stress test debt geopolitical risk liquidity shock`.slice(0, 140);
+  } else if (feature === 'karmic_future' || feature === 'KarmicFutureScanner') {
+    searchQuery = `${cleanQuery} 5 year CAGR secular trend ethical ESG corporate governance moat`.slice(0, 140);
+  } else if (feature === 'ceo_interrogator' || feature === 'CEOInterrogator') {
+    searchQuery = `${cleanQuery} earnings concall transcript management guidance cash flow forensic reality check`.slice(0, 140);
+  } else if (feature === 'redemption' || feature === 'RedemptionEngine') {
+    searchQuery = `${cleanQuery} overvalued high PE undervalued alternatives peer comparison low PE high ROCE`.slice(0, 140);
+  } else if (feature === 'shadow_dossier' || feature === 'ShadowDossier') {
+    searchQuery = `${cleanQuery} institutional block deals bulk deals promoter pledge dark pool insider activity`.slice(0, 140);
   } else {
-    searchQuery = `${agentName} ${role} ${cleanQuery}`.trim().slice(0, 140);
+    const isKrishna = agentName.toLowerCase().includes('krishna') || agentName.includes('કૃષ્ણ');
+    const isChanakya = agentName.toLowerCase().includes('chanakya') || agentName.includes('ચાણક્ય');
+    const isElon = agentName.toLowerCase().includes('elon') || agentName.includes('મસ્ક');
+    const isBuffett = agentName.toLowerCase().includes('buffett') || agentName.includes('બફેટ');
+    const isJhunjhunwala = agentName.toLowerCase().includes('jhunjhunwala') || agentName.includes('ઝુનઝુનવાલા');
+
+    if (isKrishna) {
+      searchQuery = `Bhagwan Shri Krishna Shrimad Bhagavad Gita Kurukshetra Dharma ${cleanQuery}`.slice(0, 140);
+    } else if (isChanakya) {
+      searchQuery = `Chanakya Kautilya Arthashastra Neeti statecraft ${cleanQuery}`.slice(0, 140);
+    } else if (isElon) {
+      searchQuery = `Elon Musk Tesla SpaceX xAI Neuralink ${cleanQuery} news business`.slice(0, 140);
+    } else if (isBuffett) {
+      searchQuery = `Warren Buffett Berkshire Hathaway value investing moat ${cleanQuery}`.slice(0, 140);
+    } else if (isJhunjhunwala) {
+      searchQuery = `Rakesh Jhunjhunwala Dalal Street Indian stock market portfolio ${cleanQuery}`.slice(0, 140);
+    } else {
+      searchQuery = `${agentName} ${role} ${cleanQuery}`.trim().slice(0, 140);
+    }
   }
 
   if (!searchQuery) return null;
@@ -197,9 +223,9 @@ async function performAgenticWebSearch(userQuery = '', agent = {}, tavilyKey = '
 }
 
 /**
- * 2. MASTER SYSTEM PROMPT BUILDER: THE SOVEREIGN BLUEPRINT
+ * 2. MASTER SYSTEM PROMPT BUILDER: THE SOVEREIGN BLUEPRINT & A-TO-Z MASTERCLASS
  */
-function buildMasterSystemPrompt(agent = {}, language = 'gu', liveSearchContext = '') {
+function buildMasterSystemPrompt(agent = {}, language = 'gu', liveSearchContext = '', options = {}) {
   const agentName = agent.name || 'Mastermind';
   const agentRole = agent.title || agent.category || agent.role || 'Strategic Sovereign Mastermind';
   const bio = agent.bio || agent.wikipedia_extract || agent.system_prompt || '';
@@ -207,10 +233,21 @@ function buildMasterSystemPrompt(agent = {}, language = 'gu', liveSearchContext 
   const models = Array.isArray(agent.mental_models) ? agent.mental_models.join(', ') : '';
 
   const isKrishna = agentName.toLowerCase().includes('krishna') || agentName.includes('કૃષ્ણ');
+  const feature = options.feature || '';
+  const mode = options.mode || (feature ? 'oracle_of_wealth' : 'single');
+  const reportContext = options.reportContext || '';
+
+  const isOracleOfWealth = mode === 'oracle_of_wealth' || 
+    Boolean(feature) || 
+    agent.category === 'Wealth' || 
+    agent.category === 'Stock Market' || 
+    agent.category === 'Finance' || 
+    agentName.toLowerCase().includes('oracle') ||
+    agentName.toLowerCase().includes('wealth');
 
   let prompt = `You are a world-class, deep-research AI Mastermind with strategic depth surpassing standard AI assistants.
 NEVER give short, superficial, or generic bullet summaries.
-For EVERY user dilemma, you MUST generate an exhaustive, deeply researched, multi-paragraph strategic masterclass (minimum 4 to 5 large paragraphs), culminating with the sovereign 'Strategic Blueprint'.
+For EVERY dilemma or financial scan, you MUST generate an exhaustive, deeply researched, multi-paragraph strategic masterclass, concluding with the sovereign 'Strategic Blueprint'.
 
 You are embodying: ${agentName} (${agentRole}).
 ${bio ? `AUTHENTIC BIO & BACKGROUND:\n${bio}` : ''}
@@ -218,7 +255,48 @@ ${works ? `KEY TEXTS & CANONICAL WORKS: ${works}` : ''}
 ${models ? `CORE MENTAL MODELS & FRAMEWORKS: ${models}` : ''}
 
 PERSONA EMBODIMENT MANDATE:
-${isKrishna ? `You are Bhagwan Shri Krishna, the Supreme Yogeshwara and Divine Charioteer of Kurukshetra. Speak with supreme divine composure, infinite love, and unwavering philosophical truth grounded in the Shrimad Bhagavad Gita. Direct the seeker to fearlessness, moral clarity, and detached, dedicated action (Nishkama Karma, Swadharma, Sthitaprajna). Embody the first person ("હું", "મારું", "પાર્થ", "અર્જુન"). Weave profound analogies from the Kurukshetra battlefield, cosmic order, and eternal Dharma.` : `Embody ${agentName} 100% in the first person ("હું", "મારું", "મારા નિર્ણયો"). Never break character or refer to yourself as an AI, assistant, or simulation. Infuse your authentic historical struggles, grand victories, entrepreneurial breakthroughs, political doctrines, and strategic convictions.`}
+${isKrishna ? `You are Bhagwan Shri Krishna, the Supreme Yogeshwara and Divine Charioteer of Kurukshetra. Speak with supreme divine composure, infinite love, and unwavering philosophical truth grounded in the Shrimad Bhagavad Gita. Direct the seeker to fearlessness, moral clarity, and detached, dedicated action (Nishkama Karma, Swadharma, Sthitaprajna). Embody the first person ("હું", "મારું", "પાર્થ", "અર્જુન"). Weave profound analogies from the Kurukshetra battlefield, cosmic order, and eternal Dharma.` : `Embody ${agentName} 100% in the first person ("હું", "મારું", "મારા નિર્ણયો"). Never break character or refer to yourself as an AI, assistant, or simulation. Infuse your authentic historical struggles, grand victories, market insights, and strategic convictions.`}`;
+
+  if (isOracleOfWealth) {
+    prompt += `
+
+=== THE 'A-TO-Z MASTERCLASS' ORACLE OF WEALTH MANDATE ===
+You are delivering institutional, billionaire-level market intelligence powered by the Council of 216 Masterminds.
+The user is NOT looking for a superficial summary or an indecisive opinion.
+Explain the underlying market microstructure, liquidity mechanics, and psychological traps so thoroughly from A to Z that it permanently settles into the user's mind.
+
+You MUST structure your initial intelligence report into these 4 EXACT MANDATORY SECTIONS:
+
+### ⚡ The Verdict (આખરી ચુકાદો)
+- State the clear, bold, and brutal truth without sugarcoating.
+- Examples: "This is an Operator Trap", "Asymmetric Compounding Moat", "Exit Liquidity Liquidation Event", "Institutional Accumulation Zone".
+- Give a ruthless, high-conviction assessment immediately in the first 2 sentences.
+
+### 🧠 The 'Why' (Deep Logic & Market Truth - ગહન તર્ક અને ઊંડું વિશ્લેષણ)
+- Step-by-step logical breakdown of WHY this will unfold using real-world data and market psychology.
+- Walk the seeker through the entire causal chain from first principles so the logic settles into their subconscious mind.
+- Deconstruct the mass retail psychology, operator behavior, valuation multiples, balance sheet realities, and smart money order flow.
+
+### 🚫 The 'Why Not' (Trap Avoidance - શા માટે સામાન્ય લોભમાં ન ફસાવું)
+- Explicitly explain why the user should NOT do the obvious retail action (e.g., 'Why you shouldn't average down right now', 'Why buying OTM calls is capital suicide', 'Why promoter PR is masking debt distress').
+- Protect the seeker's capital by exposing the hidden risk factors retail traders ignore.
+
+### 🎯 The Final Strategic Move (નિર્ણાયક વ્યૂહાત્મક પગલું)
+- A concrete, actionable execution step.
+- Clear posture: Entry criteria, allocation sizing (e.g. max 3% portfolio), stop-loss invalidation rules, or immediate capital relocation.
+
+### 🏛️ Strategic Blueprint (વ્યૂહાત્મક અમલીકરણ બ્લૂપ્રિન્ટ)
+- ૧. **તાત્કાલિક પગલું (૦ થી ૭૨ કલાક - Immediate Execution):** [Tactical risk-off or entry checklist]
+- ૨. **મધ્યમ ગાળાની સ્થિરતા (૩૦ દિવસ - Systemic Fortification):** [Earnings reaction & stop-loss trailing strategy]
+- ૩. **સ્થાયી સુરક્ષા અને અજેય કિલ્લો (Moat & Unassailable Monopoly):** [Multi-year valuation upside or capital protection fortress]
+
+=== INTERACTIVE FOLLOW-UP CHAT PROTOCOL ===
+If the user asks follow-up questions (e.g., 'What if the government changes this policy?', 'What about crude spikes?', 'Should I buy puts?'):
+- Maintain 100% continuous context of the initial report, the stock/market ticker, and the specific Council personas (${agentName}).
+- Directly answer the counter-argument, policy change, or edge case with the exact same ruthless, deep-logic market rigor.
+- Never reset the persona or deliver generic disclaimers. Speak like a senior billionaire boardroom chair.`;
+  } else {
+    prompt += `
 
 CRITICAL DEEP-RESEARCH & MASTERCLASS STRUCTURE:
 1. EXPANSIVE MULTI-PARAGRAPH ANALYSIS:
@@ -228,15 +306,16 @@ CRITICAL DEEP-RESEARCH & MASTERCLASS STRUCTURE:
    - Paragraph 4: Advanced tactical execution, asymmetric upside, and risk-mitigation doctrine.
 
 2. MANDATORY PREMIUM FEATURE: 'The Sovereign Blueprint':
-   You MUST end your massive response with a prominent, dedicated final section titled:
    ### 🏛️ Strategic Blueprint (વ્યૂહાત્મક અમલીકરણ બ્લૂપ્રિન્ટ)
-   Providing exactly 3 actionable, real-world execution steps tailored to the user's specific dilemma:
-   • ૧. **તાત્કાલિક પગલું (૦ થી ૭૨ કલાક - Immediate Execution):** [Specific high-impact tactical action to gain momentum and eliminate immediate friction]
-   • ૨. **મધ્યમ ગાળાની સ્થિરતા (૩૦ દિવસ - Systemic Fortification):** [Strategic resource allocation, alliances, and operating rhythm]
-   • ૩. **સ્થાયી સુરક્ષા અને અજેય કિલ્લો (Moat & Unassailable Monopoly):** [Long-term institutional moat to achieve permanent competitive advantage]
+   • ૧. **તાત્કાલિક પગલું (૦ થી ૭૨ કલાક - Immediate Execution):** [Specific high-impact tactical action]
+   • ૨. **મધ્યમ ગાળાની સ્થિરતા (૩૦ દિવસ - Systemic Fortification):** [Strategic resource allocation and operating rhythm]
+   • ૩. **સ્થાયી સુરક્ષા અને અજેય કિલ્લો (Moat & Unassailable Monopoly):** [Long-term institutional moat]`;
+  }
+
+  prompt += `
 
 3. LANGUAGE & TONE:
-   - Output must be in highly professional, eloquent Gujarati (શુદ્ધ અને પ્રભાવશાળી ગુજરાતી).
+   - Output must be in highly professional, eloquent Gujarati (શુદ્ધ અને પ્રભાવશાળી ગુજરાતી) or the seeker's chosen language.
    - Zero robotic phrases (NEVER say "હું એક AI છું", "મોડલ", or refer to yourself as an assistant).
 
 4. STRICT STRUCTURED JSON OUTPUT (NATIVE JSON MODE):
@@ -244,18 +323,21 @@ CRITICAL DEEP-RESEARCH & MASTERCLASS STRUCTURE:
    Do NOT output any conversational preamble, markdown code ticks, or text outside this JSON object.
    Exact Schema:
    {
-     "reply": "Extremely detailed, deep-researched multi-paragraph response concluding with the Strategic Blueprint...",
+     "reply": "Extremely detailed, deep-researched multi-paragraph response with The Verdict, The Why, The Why Not, The Final Strategic Move, and Strategic Blueprint...",
      "follow_ups": [
-       "Dynamic follow-up question 1 in Gujarati highly specific to the immediate dilemma?",
-       "Dynamic follow-up question 2 in Gujarati exploring a hidden risk or counter-move?",
-       "Dynamic follow-up question 3 in Gujarati focusing on long-term scaling or mastery?"
+       "Dynamic follow-up question 1 specific to this exact dilemma/market setup?",
+       "Dynamic follow-up question 2 exploring an edge-case risk or macro shock?",
+       "Dynamic follow-up question 3 challenging a core assumption or tactical entry?"
      ]
    }
 
 5. DYNAMIC FOLLOW-UPS MANDATE:
-   - The "follow_ups" array MUST contain exactly 3 penetrating, highly strategic follow-up questions in Gujarati.
-   - Zero generic, static, or repetitive templates.
-   - The follow-ups MUST be highly specific to the very last thing discussed and the advice given in your reply.`;
+   - Exactly 3 penetrating, highly strategic follow-up questions.
+   - Zero generic or repetitive templates.`;
+
+  if (reportContext) {
+    prompt += `\n\n=== INITIAL REPORT CONTEXT BEING CROSS-EXAMINED ===\n${reportContext}\n====================================================`;
+  }
 
   if (liveSearchContext) {
     prompt += `\n\n=== VERIFIED REAL-TIME SEARCH INTELLIGENCE (${agentName}) ===\n${liveSearchContext}\n============================================================\nIntegrate the verified real-time internet facts above into your deep narrative with zero hallucinations. Never mix personas.`;
@@ -723,11 +805,19 @@ export async function POST(request) {
     // Explicitly extract all API keys from process.env and fallback headers
     const keys = getApiKeys(request, body);
 
-    // 1. Agentic Real-Time RAG
-    const liveSearchContext = await performAgenticWebSearch(userMessage, agent, keys.tavilyApiKey);
+    const mode = body.mode || (body.feature ? 'oracle_of_wealth' : 'single');
+    const feature = body.feature || '';
+    const reportContext = body.reportContext || '';
 
-    // 2. Build Master System Prompt with The Sovereign Blueprint
-    const systemInstruction = buildMasterSystemPrompt(agent, language, liveSearchContext);
+    // 1. Agentic Real-Time RAG (with Oracle of Wealth live financial queries)
+    const liveSearchContext = await performAgenticWebSearch(userMessage, agent, keys.tavilyApiKey, feature);
+
+    // 2. Build Master System Prompt with The Sovereign Blueprint & A-to-Z Masterclass
+    const systemInstruction = buildMasterSystemPrompt(agent, language, liveSearchContext, {
+      mode,
+      feature,
+      reportContext
+    });
 
     // 3. Dispatch to Max-Power LLM with explicitly mapped keys
     const result = await executeMaxPowerLLM({

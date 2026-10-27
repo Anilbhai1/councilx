@@ -16,6 +16,7 @@ export default function Header({
   isPremium = false,
   remainingFree = 5,
   onOpenSupremeCouncil,
+  onOpenOracle,
   onOpenHistory,
   onOpenReferral,
   onOpenSettings,
@@ -99,6 +100,19 @@ export default function Header({
             <Text style={styles.langPillText}>{currentLangObj.label}</Text>
             <Ionicons name="chevron-down" size={10} color="#888888" />
           </TouchableOpacity>
+
+          {/* Oracle of Wealth Engine Pill */}
+          {onOpenOracle && (
+            <TouchableOpacity
+              style={styles.oraclePill}
+              onPress={onOpenOracle}
+              activeOpacity={0.8}
+              accessibilityLabel="Oracle of Wealth Stock Market Intelligence Engine"
+            >
+              <Ionicons name="trending-up" size={11} color="#D4AF37" />
+              <Text style={styles.oraclePillText}>ORACLE</Text>
+            </TouchableOpacity>
+          )}
 
           {/* Quota / Pro Pill */}
           <TouchableOpacity
@@ -351,5 +365,22 @@ const styles = StyleSheet.create({
     color: '#888888',
     fontSize: 10,
     lineHeight: 14,
+  },
+  oraclePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#121008',
+    borderColor: '#D4AF37',
+    borderWidth: 1,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 14,
+  },
+  oraclePillText: {
+    color: '#D4AF37',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 0.6,
   },
 });

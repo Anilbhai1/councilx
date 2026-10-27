@@ -187,7 +187,10 @@ export const geminiService = {
     language = 'gu',
     modelType = 'flash',
     thinkingDepth = 'medium',
-    isPremium = false
+    isPremium = false,
+    mode = 'single',
+    feature = null,
+    reportContext = null
   }) {
     const activeChatId = chat_id || chatId;
     let apiError = null;
@@ -223,7 +226,10 @@ export const geminiService = {
             modelType,
             thinkingDepth,
             isPremium,
-            clientApiKey: clientKey || undefined
+            clientApiKey: clientKey || undefined,
+            mode: mode || (feature ? 'oracle_of_wealth' : 'single'),
+            feature,
+            reportContext
           }),
           signal: controller ? controller.signal : undefined
         });
@@ -352,6 +358,32 @@ export const geminiService = {
       language,
       modelType: 'flash',
       thinkingDepth
+    });
+  },
+
+  /**
+   * ORACLE OF WEALTH: 8 Master Financial Intelligence Engines
+   * Enforces The Verdict, The Why (Deep Logic), The Why Not (Trap Avoidance), and The Final Move
+   */
+  async generateOracleWealthReport({
+    feature = 'pre_market',
+    userQuery = '',
+    agent = {},
+    chatHistory = [],
+    language = 'gu',
+    reportContext = ''
+  }) {
+    return this.generateAgentResponse({
+      agent,
+      userMessage: userQuery,
+      chatHistory,
+      language,
+      mode: 'oracle_of_wealth',
+      feature,
+      reportContext,
+      modelType: 'pro',
+      thinkingDepth: 'deep',
+      isPremium: true
     });
   },
 
