@@ -246,7 +246,29 @@ export default function SyndicateScreen({ route, navigation }) {
       console.error('Supreme council error:', err);
       setLoading(false);
       setIsStreaming(false);
-      Alert.alert('Chamber Error', err?.message || 'The supreme council deliberation could not connect. Please check your network and API keys.');
+
+      const rawErrMsg = err?.message || 'Request timed out or service unavailable';
+      const isTimeout = /time.*out|abort|504|gateway/i.test(rawErrMsg);
+
+      const errorText = isTimeout
+        ? (lang === 'gu'
+            ? `⚠️ **સર્વર ટાઇમઆઉટ (Server Timeout):**\n\n૨૧૬ સર્વોચ્ચ મહા-સભાનું ગહન સંકલન તૈયાર કરવામાં સર્વર વિલંબ થયો છે.\n\n*વિગત:* ${rawErrMsg}\n\nકૃપા કરીને ફરીથી પ્રયત્ન કરો.`
+            : `⚠️ **Server Timeout Notice:**\n\nThe Supreme Council deliberation timed out while formulating deep research counsel.\n\n*Details:* ${rawErrMsg}\n\nPlease try again.`)
+        : (lang === 'gu'
+            ? `⚠️ **ચેમ્બર કનેક્શન સૂચના:**\n\n${rawErrMsg}\n\nકૃપા કરીને થોડી ક્ષણો પછી ફરી પ્રયાસ કરો.`
+            : `⚠️ **Chamber Notice:**\n\n${rawErrMsg}\n\nPlease try again shortly.`);
+
+      const errorMsg = {
+        id: `msg_err_${Date.now()}`,
+        role: 'assistant',
+        content: errorText,
+        isError: true,
+        agent_name: t('supremeCouncilBadge', '૨૧૬ મહા-સભા'),
+        createdAt: new Date().toISOString()
+      };
+
+      setMessages([...updatedMessages, errorMsg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 120);
     }
   };
 

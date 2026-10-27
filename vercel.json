@@ -29,7 +29,19 @@
       ]
     }
   ],
+  "functions": {
+    "api/chat/route.js": {
+      "runtime": "edge"
+    },
+    "app/api/chat/route.js": {
+      "runtime": "edge"
+    }
+  },
   "rewrites": [
+    {
+      "source": "/api/chat",
+      "destination": "/api/chat/route"
+    },
     {
       "source": "/api/:path*",
       "destination": "/api/:path*"

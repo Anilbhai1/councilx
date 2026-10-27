@@ -329,7 +329,31 @@ export default function ChatScreen({ route, navigation }) {
       console.error('Chat error:', err);
       setLoading(false);
       setIsStreaming(false);
-      Alert.alert('AI Engine Error', err?.message || 'The AI service could not be reached. Please check your network and API keys.');
+
+      const rawErrMsg = err?.message || 'Request timed out or service unavailable';
+      const isTimeout = /time.*out|abort|504|gateway/i.test(rawErrMsg);
+
+      const errorText = isTimeout
+        ? (lang === 'gu'
+            ? `⚠️ **સર્વર ટાઇમઆઉટ (Server Timeout):**\n\nમાસ્ટરમાઇન્ડ સાથેનું જોડાણ સમય મર્યાદા (Timeout) વટાવી ગયું છે. ગહન વિશ્લેષણમાં સામાન્ય કરતાં વધુ સમય લાગ્યો છે.\n\n*વિગત:* ${rawErrMsg}\n\nકૃપા કરીને ફરીથી પ્રયત્ન કરો.`
+            : `⚠️ **Server Timeout Notice:**\n\nThe request took longer than expected and timed out while formulating deep research counsel.\n\n*Details:* ${rawErrMsg}\n\nPlease try again.`)
+        : (lang === 'gu'
+            ? `⚠️ **કનેક્શન ત્રુટિ (Connection Notice):**\n\n${rawErrMsg}\n\nકૃપા કરીને થોડી ક્ષણો પછી ફરી પ્રયાસ કરો.`
+            : `⚠️ **Connection Notice:**\n\n${rawErrMsg}\n\nPlease try again shortly.`);
+
+      const errorMsg = {
+        id: `msg_err_${Date.now()}`,
+        role: 'assistant',
+        content: errorText,
+        isError: true,
+        agent_id: agent?.id,
+        agent_name: agent?.name || 'Mastermind',
+        agent_avatar: guaranteedAvatar,
+        createdAt: new Date().toISOString()
+      };
+
+      setMessages([...updatedMessages, errorMsg]);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 120);
     }
   };
 
@@ -378,7 +402,11 @@ export default function ChatScreen({ route, navigation }) {
           />
         )}
 
-        <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
+        <View style={[
+          styles.bubble,
+          isUser ? styles.userBubble : styles.assistantBubble,
+          item.isError && styles.errorBubble
+        ]}>
           {!isUser && (
             <View style={styles.agentHeaderLine}>
               <Text style={styles.agentMsgName}>{item.agent_name || agent?.name || 'Mastermind'}</Text>
@@ -784,6 +812,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#242424',
     borderBottomLeftRadius: 2,
+  },
+  errorBubble: {
+    backgroundColor: '#1C1212',
+    borderColor: '#7F1D1D',
+    borderWidth: 1.5,
   },
   agentHeaderLine: {
     flexDirection: 'row',

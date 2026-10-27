@@ -199,6 +199,9 @@ export const geminiService = {
 
     for (const endpoint of endpoints) {
       try {
+        const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        const timeoutId = controller ? setTimeout(() => controller.abort(), 55000) : null;
+
         const resp = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -212,8 +215,11 @@ export const geminiService = {
             modelType,
             thinkingDepth,
             isPremium
-          })
+          }),
+          signal: controller ? controller.signal : undefined
         });
+
+        if (timeoutId) clearTimeout(timeoutId);
 
         const data = await resp.json().catch(() => null);
 
@@ -230,11 +236,21 @@ export const geminiService = {
             followUpQuestions: followUps,
             model: data.model
           };
-        } else if (data && data.error) {
-          apiError = new Error(data.error);
+        } else if (!resp.ok) {
+          if (resp.status === 504) {
+            apiError = new Error('Gateway Timeout (504): The deep research analysis exceeded execution timeout.');
+          } else if (data && data.error) {
+            apiError = new Error(data.error);
+          } else {
+            apiError = new Error(`Server returned error status (${resp.status})`);
+          }
         }
       } catch (callErr) {
-        apiError = callErr;
+        if (callErr.name === 'AbortError') {
+          apiError = new Error('Request timed out after 55s. The AI model took too long to complete.');
+        } else {
+          apiError = callErr;
+        }
       }
     }
 

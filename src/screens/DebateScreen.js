@@ -105,7 +105,7 @@ export default function DebateScreen({ navigation }) {
       });
     } catch (e) {
       console.error('Debate error:', e);
-      Alert.alert('Chamber Error', e?.message || 'Failed to convene the Masterminds debate. Please check your network and API keys.');
+      setDebateContent(`⚠️ **ડિબેટ ચેમ્બર સૂચના (Debate Arena Timeout/Notice):**\n\nમંથન અને તારણો મેળવવામાં વિલંબ અથવા સર્વર ટાઇમઆઉટ થયો છે:\n\n*વિગત:* ${e?.message || 'Request timed out or service unavailable.'}\n\nકૃપા કરીને ફરીથી પ્રયત્ન કરો.`);
     } finally {
       setLoading(false);
     }
