@@ -1,5 +1,5 @@
 {
-  "buildCommand": "npx expo export -p web",
+  "buildCommand": "chmod +x ./node_modules/.bin/expo && npx expo export -p web",
   "outputDirectory": "dist",
   "headers": [
     {
