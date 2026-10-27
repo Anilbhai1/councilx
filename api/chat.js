@@ -25,12 +25,95 @@
 // Pure Web Standards & Edge compatible (fetch, Request, Response, JSON)
 
 /**
+ * Helper to explicitly extract and trim API keys from environment variables, request headers, and client payload
+ */
+function getApiKeys(req = null, body = {}) {
+  const reqHeaders = req?.headers;
+  const getHeader = (name) => {
+    if (!reqHeaders) return '';
+    try {
+      if (typeof reqHeaders.get === 'function') {
+        return reqHeaders.get(name) || reqHeaders.get(name.toLowerCase()) || '';
+      }
+      return reqHeaders[name] || reqHeaders[name.toLowerCase()] || '';
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Google Gemini Explicit Mapping
+  const geminiApiKey = (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+    getHeader('x-goog-api-key') ||
+    getHeader('X-Goog-Api-Key') ||
+    body?.clientApiKey ||
+    body?.geminiApiKey ||
+    body?.apiKey ||
+    ''
+  ).trim();
+
+  // OpenAI Explicit Mapping
+  const openaiApiKey = (
+    process.env.OPENAI_API_KEY ||
+    getHeader('x-openai-api-key') ||
+    (getHeader('authorization') || '').replace(/^Bearer\s+/i, '') ||
+    body?.openaiApiKey ||
+    ''
+  ).trim();
+
+  // Anthropic Claude Explicit Mapping
+  const anthropicApiKey = (
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.CLAUDE_API_KEY ||
+    getHeader('x-anthropic-api-key') ||
+    body?.anthropicApiKey ||
+    ''
+  ).trim();
+
+  // Groq Explicit Mapping
+  const groqApiKey = (
+    process.env.GROQ_API_KEY ||
+    getHeader('x-groq-api-key') ||
+    body?.groqApiKey ||
+    ''
+  ).trim();
+
+  // DeepSeek Explicit Mapping
+  const deepseekApiKey = (
+    process.env.DEEPSEEK_API_KEY ||
+    getHeader('x-deepseek-api-key') ||
+    body?.deepseekApiKey ||
+    ''
+  ).trim();
+
+  // Tavily Explicit Mapping
+  const tavilyApiKey = (
+    process.env.TAVILY_API_KEY ||
+    getHeader('x-tavily-api-key') ||
+    body?.tavilyApiKey ||
+    ''
+  ).trim();
+
+  return {
+    geminiApiKey,
+    openaiApiKey,
+    anthropicApiKey,
+    groqApiKey,
+    deepseekApiKey,
+    tavilyApiKey
+  };
+}
+
+/**
  * 1. AGENTIC REAL-TIME RAG: PERSONA-ALIGNED LIVE SEARCH ENGINE
  * Autonomously fetches real-world intelligence strictly aligned with the Agent's persona
  * (e.g. Elon Musk's latest business moves, or verified historical facts about Shri Krishna).
  * Never mixes personas.
  */
-async function performAgenticWebSearch(userQuery = '', agent = {}) {
+async function performAgenticWebSearch(userQuery = '', agent = {}, tavilyKeyParam = '') {
   const agentName = agent.name || 'Mastermind';
   const role = agent.title || agent.category || agent.role || '';
   const cleanQuery = (userQuery || '').trim();
@@ -56,7 +139,7 @@ async function performAgenticWebSearch(userQuery = '', agent = {}) {
   const facts = [];
 
   // A. Tavily Search API (Deep live internet search)
-  const tavilyKey = process.env.TAVILY_API_KEY;
+  const tavilyKey = tavilyKeyParam || process.env.TAVILY_API_KEY;
   if (tavilyKey) {
     try {
       const tavilyRes = await fetch('https://api.tavily.com/search', {
@@ -310,9 +393,10 @@ function parseStructuredResponse(rawText = '') {
  */
 async function executeMaxPowerLLM({
   systemInstruction,
-  messagesHistory,
-  userMessage,
-  agent
+  messagesHistory = [],
+  userMessage = '',
+  agent = {},
+  keys = {}
 }) {
   const errors = [];
 
@@ -335,7 +419,7 @@ async function executeMaxPowerLLM({
   }
 
   // Provider 1: OpenAI GPT-4o
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiKey = keys.openaiApiKey || process.env.OPENAI_API_KEY || '';
   if (openaiKey && !openaiKey.includes('your_openai_api_key')) {
     try {
       const oRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -372,7 +456,7 @@ async function executeMaxPowerLLM({
   }
 
   // Provider 2: Anthropic Claude 3.5 Sonnet
-  const anthropicKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+  const anthropicKey = keys.anthropicApiKey || process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY || '';
   if (anthropicKey && !anthropicKey.includes('your_anthropic_api_key')) {
     try {
       const claudeMessages = fullConversation
@@ -422,7 +506,7 @@ async function executeMaxPowerLLM({
   }
 
   // Provider 3: DeepSeek V3 / DeepSeek Chat
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const deepseekKey = keys.deepseekApiKey || process.env.DEEPSEEK_API_KEY || '';
   if (deepseekKey && !deepseekKey.includes('your_deepseek_api_key')) {
     try {
       const dsRes = await fetch('https://api.deepseek.com/chat/completions', {
@@ -459,7 +543,7 @@ async function executeMaxPowerLLM({
   }
 
   // Provider 4: Groq Llama 3.3 70B Versatile
-  const groqKey = process.env.GROQ_API_KEY;
+  const groqKey = keys.groqApiKey || process.env.GROQ_API_KEY || '';
   if (groqKey && !groqKey.includes('your_groq_api_key')) {
     try {
       const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -496,7 +580,18 @@ async function executeMaxPowerLLM({
   }
 
   // Provider 5: Google Gemini API (gemini-2.0-flash, gemini-1.5-pro, gemini-1.5-flash)
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+  const geminiConfig = {
+    apiKey: (
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+      keys?.geminiApiKey ||
+      ''
+    ).trim(),
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta'
+  };
+  const geminiKey = geminiConfig.apiKey;
   if (geminiKey && !geminiKey.includes('your_gemini_api_key')) {
     // Format messages for Gemini contents array with strictly alternating user and model turns
     const geminiContents = [];
@@ -550,7 +645,7 @@ async function executeMaxPowerLLM({
           }
         };
 
-        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -584,7 +679,7 @@ async function executeMaxPowerLLM({
           }
         };
 
-        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -610,6 +705,8 @@ async function executeMaxPowerLLM({
         errors.push(`Gemini ${model} error: ${err.message}`);
       }
     }
+  } else {
+    errors.push('Gemini API key is not configured in environment variables (checked GEMINI_API_KEY, GOOGLE_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, EXPO_PUBLIC_GEMINI_API_KEY).');
   }
 
   // If ALL providers failed, return null with detailed errors array
@@ -622,7 +719,15 @@ async function executeMaxPowerLLM({
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-goog-api-key');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-goog-api-key, x-openai-api-key, x-anthropic-api-key, x-groq-api-key');
+
+  let body = req.body;
+  if (typeof body === 'string') {
+    try { body = JSON.parse(body); } catch (e) { body = {}; }
+  }
+  body = body || {};
+
+  const keys = getApiKeys(req, body);
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
@@ -633,12 +738,12 @@ module.exports = async function handler(req, res) {
       status: 'online',
       service: 'CouncilX Max-Power Agentic AI RAG & Sovereign Blueprint Engine',
       providers: {
-        openai: Boolean(process.env.OPENAI_API_KEY),
-        anthropic: Boolean(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY),
-        deepseek: Boolean(process.env.DEEPSEEK_API_KEY),
-        groq: Boolean(process.env.GROQ_API_KEY),
-        gemini: Boolean(process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY),
-        tavily: Boolean(process.env.TAVILY_API_KEY)
+        gemini: Boolean(keys.geminiApiKey),
+        openai: Boolean(keys.openaiApiKey),
+        anthropic: Boolean(keys.anthropicApiKey),
+        deepseek: Boolean(keys.deepseekApiKey),
+        groq: Boolean(keys.groqApiKey),
+        tavily: Boolean(keys.tavilyApiKey)
       }
     });
   }
@@ -648,12 +753,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    let body = req.body;
-    if (typeof body === 'string') {
-      try { body = JSON.parse(body); } catch (e) { body = {}; }
-    }
-    body = body || {};
-
     const agent = body.agent || { name: 'Bhagwan Shri Krishna', title: 'Supreme Yogeshwara' };
     const userMessage = body.userMessage || body.message || body.prompt || (body.contents ? body.contents[body.contents.length - 1]?.parts?.[0]?.text : '') || (body.payload?.contents ? body.payload.contents[body.payload.contents.length - 1]?.parts?.[0]?.text : '');
     const chatId = body.chat_id || body.sessionId || body.session_id || body.conversation_id || body.id;
@@ -687,7 +786,7 @@ module.exports = async function handler(req, res) {
     }
 
     // 1. Agentic Real-Time RAG: Persona-aligned Web Search
-    const liveSearchContext = await performAgenticWebSearch(userMessage, agent);
+    const liveSearchContext = await performAgenticWebSearch(userMessage, agent, keys.tavilyApiKey);
 
     // 2. Build Master System Prompt with The Sovereign Blueprint mandate
     const systemInstruction = buildMasterSystemPrompt(agent, language, liveSearchContext);
@@ -697,15 +796,27 @@ module.exports = async function handler(req, res) {
       systemInstruction,
       messagesHistory: Array.isArray(chatHistory) ? chatHistory : [],
       userMessage,
-      agent
+      agent,
+      keys
     });
 
     // 4. Handle Result: If LLM failed, return actual error status. ZERO STATIC FALLBACKS!
     if (!result || result.error || !result.reply) {
       console.error('[CouncilX Chat API Error]: All LLM providers failed.', result?.errors);
+      const configuredList = [];
+      if (keys.geminiApiKey) configuredList.push('Gemini');
+      if (keys.openaiApiKey) configuredList.push('OpenAI');
+      if (keys.anthropicApiKey) configuredList.push('Anthropic');
+      if (keys.groqApiKey) configuredList.push('Groq');
+      if (keys.deepseekApiKey) configuredList.push('DeepSeek');
+
+      const configStatus = configuredList.length > 0
+        ? `Configured providers (${configuredList.join(', ')}) failed to return valid response.`
+        : 'No API keys detected in server environment. Please set GEMINI_API_KEY (or GOOGLE_API_KEY) in Vercel Project Settings > Environment Variables.';
+
       return res.status(502).json({
         success: false,
-        error: 'AI Generation Failed: All configured LLM providers (GPT-4o, Claude 3.5 Sonnet, DeepSeek, Groq, Gemini) failed to produce a valid response. Please ensure a valid API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, or GEMINI_API_KEY) is configured.',
+        error: `AI Generation Failed: ${configStatus}`,
         details: result?.errors || ['No response generated']
       });
     }

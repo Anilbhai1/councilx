@@ -6,14 +6,102 @@ export const maxDuration = 60;
  * COUNCIL X | THE SYNDICATE
  * Vercel Edge Runtime Chat API Handler
  * 
- * Configured for Edge Runtime to bypass strict 10s Serverless timeout limits.
- * Pure Web Standards (Fetch API, Web Request, Web Response, JSON).
+ * Explicit Environment Variable Mapping for Edge Runtime:
+ * - Google Gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY
+ * - OpenAI: process.env.OPENAI_API_KEY
+ * - Anthropic: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+ * - Groq: process.env.GROQ_API_KEY
+ * - DeepSeek: process.env.DEEPSEEK_API_KEY
+ * - Tavily: process.env.TAVILY_API_KEY
  */
+
+/**
+ * Helper to explicitly extract and trim API keys from Edge process.env, request headers, and client payload
+ */
+function getApiKeys(request = null, body = {}) {
+  const reqHeaders = request?.headers;
+  const getHeader = (name) => {
+    if (!reqHeaders) return '';
+    try {
+      if (typeof reqHeaders.get === 'function') {
+        return reqHeaders.get(name) || reqHeaders.get(name.toLowerCase()) || '';
+      }
+      return reqHeaders[name] || reqHeaders[name.toLowerCase()] || '';
+    } catch (e) {
+      return '';
+    }
+  };
+
+  // Google Gemini Explicit Mapping
+  const geminiApiKey = (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+    process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+    getHeader('x-goog-api-key') ||
+    getHeader('X-Goog-Api-Key') ||
+    body?.clientApiKey ||
+    body?.geminiApiKey ||
+    body?.apiKey ||
+    ''
+  ).trim();
+
+  // OpenAI Explicit Mapping
+  const openaiApiKey = (
+    process.env.OPENAI_API_KEY ||
+    getHeader('x-openai-api-key') ||
+    (getHeader('authorization') || '').replace(/^Bearer\s+/i, '') ||
+    body?.openaiApiKey ||
+    ''
+  ).trim();
+
+  // Anthropic Claude Explicit Mapping
+  const anthropicApiKey = (
+    process.env.ANTHROPIC_API_KEY ||
+    process.env.CLAUDE_API_KEY ||
+    getHeader('x-anthropic-api-key') ||
+    body?.anthropicApiKey ||
+    ''
+  ).trim();
+
+  // Groq Explicit Mapping
+  const groqApiKey = (
+    process.env.GROQ_API_KEY ||
+    getHeader('x-groq-api-key') ||
+    body?.groqApiKey ||
+    ''
+  ).trim();
+
+  // DeepSeek Explicit Mapping
+  const deepseekApiKey = (
+    process.env.DEEPSEEK_API_KEY ||
+    getHeader('x-deepseek-api-key') ||
+    body?.deepseekApiKey ||
+    ''
+  ).trim();
+
+  // Tavily Explicit Mapping
+  const tavilyApiKey = (
+    process.env.TAVILY_API_KEY ||
+    getHeader('x-tavily-api-key') ||
+    body?.tavilyApiKey ||
+    ''
+  ).trim();
+
+  return {
+    geminiApiKey,
+    openaiApiKey,
+    anthropicApiKey,
+    groqApiKey,
+    deepseekApiKey,
+    tavilyApiKey
+  };
+}
 
 /**
  * 1. AGENTIC REAL-TIME RAG: PERSONA-ALIGNED LIVE SEARCH ENGINE
  */
-async function performAgenticWebSearch(userQuery = '', agent = {}) {
+async function performAgenticWebSearch(userQuery = '', agent = {}, tavilyKey = '') {
   const agentName = agent.name || 'Mastermind';
   const role = agent.title || agent.category || agent.role || '';
   const cleanQuery = (userQuery || '').trim();
@@ -38,8 +126,7 @@ async function performAgenticWebSearch(userQuery = '', agent = {}) {
   const facts = [];
 
   // A. Tavily Search API
-  const tavilyKey = process.env.TAVILY_API_KEY;
-  if (tavilyKey) {
+  if (tavilyKey && !tavilyKey.includes('your_tavily_api_key')) {
     try {
       const tavilyRes = await fetch('https://api.tavily.com/search', {
         method: 'POST',
@@ -66,32 +153,7 @@ async function performAgenticWebSearch(userQuery = '', agent = {}) {
     }
   }
 
-  // B. Google / Serper API
-  const serperKey = process.env.SERPER_API_KEY;
-  if (serperKey && facts.length < 3) {
-    try {
-      const serperRes = await fetch('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': serperKey,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ q: searchQuery, num: 3 })
-      });
-      if (serperRes.ok) {
-        const serperData = await serperRes.json();
-        if (Array.isArray(serperData.organic)) {
-          serperData.organic.slice(0, 2).forEach(item => {
-            if (item.snippet) facts.push(`- [Google Live Intelligence] ${item.title}: ${item.snippet.slice(0, 300)}`);
-          });
-        }
-      }
-    } catch (sErr) {
-      console.warn('[WebSearch Serper Notice]:', sErr.message);
-    }
-  }
-
-  // C. Wikipedia Live API
+  // B. Wikipedia Live API
   try {
     const wikiTarget = agent.wiki_slug || agentName;
     const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(wikiTarget)}&utf8=&format=json`;
@@ -115,7 +177,7 @@ async function performAgenticWebSearch(userQuery = '', agent = {}) {
     console.warn('[WebSearch Wiki Notice]:', wErr.message);
   }
 
-  // D. DuckDuckGo Instant Answer API
+  // C. DuckDuckGo Instant Answer API
   if (facts.length < 2) {
     try {
       const ddgUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(agentName)}&format=json&no_html=1&skip_disambig=1`;
@@ -277,9 +339,15 @@ function parseStructuredResponse(rawText = '') {
 }
 
 /**
- * 4. UNIVERSAL MULTI-MODEL LLM DISPATCHER (EDGE COMPLIANT)
+ * 4. UNIVERSAL MULTI-MODEL LLM DISPATCHER (EDGE COMPLIANT WITH EXPLICIT KEY MAPPING)
  */
-async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMessage, agent }) {
+async function executeMaxPowerLLM({
+  systemInstruction,
+  messagesHistory,
+  userMessage,
+  agent,
+  keys = {}
+}) {
   const errors = [];
 
   const fullConversation = [
@@ -300,7 +368,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
   }
 
   // Provider 1: OpenAI GPT-4o
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiKey = keys.openaiApiKey;
   if (openaiKey && !openaiKey.includes('your_openai_api_key')) {
     try {
       const oRes = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -337,7 +405,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
   }
 
   // Provider 2: Anthropic Claude 3.5 Sonnet
-  const anthropicKey = process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY;
+  const anthropicKey = keys.anthropicApiKey;
   if (anthropicKey && !anthropicKey.includes('your_anthropic_api_key')) {
     try {
       const claudeMessages = fullConversation
@@ -386,7 +454,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
   }
 
   // Provider 3: DeepSeek
-  const deepseekKey = process.env.DEEPSEEK_API_KEY;
+  const deepseekKey = keys.deepseekApiKey;
   if (deepseekKey && !deepseekKey.includes('your_deepseek_api_key')) {
     try {
       const dsRes = await fetch('https://api.deepseek.com/chat/completions', {
@@ -423,7 +491,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
   }
 
   // Provider 4: Groq Llama 3.3 70B
-  const groqKey = process.env.GROQ_API_KEY;
+  const groqKey = keys.groqApiKey;
   if (groqKey && !groqKey.includes('your_groq_api_key')) {
     try {
       const gRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -459,8 +527,19 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
     }
   }
 
-  // Provider 5: Google Gemini
-  const geminiKey = process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY;
+  // Provider 5: Google Gemini (Explicit Configuration Mapping for Vercel Edge Runtime)
+  const geminiConfig = {
+    apiKey: (
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
+      process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
+      keys?.geminiApiKey ||
+      ''
+    ).trim(),
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta'
+  };
+  const geminiKey = geminiConfig.apiKey;
   if (geminiKey && !geminiKey.includes('your_gemini_api_key')) {
     const geminiContents = [];
     for (const msg of messagesHistory) {
@@ -499,7 +578,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
 
     const geminiModels = ['gemini-2.0-flash', 'gemini-1.5-pro', 'gemini-1.5-flash'];
     for (const model of geminiModels) {
-      // With Search tools
+      // Try 1: with Google Search Grounding tool
       try {
         const payloadWithTools = {
           system_instruction: { parts: [{ text: systemInstruction }] },
@@ -513,7 +592,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
           }
         };
 
-        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -534,7 +613,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
         }
       } catch (err) {}
 
-      // Without tools
+      // Try 2: without tools (standard JSON generation)
       try {
         const payloadWithoutTools = {
           system_instruction: { parts: [{ text: systemInstruction }] },
@@ -547,7 +626,7 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
           }
         };
 
-        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+        const gRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(geminiKey)}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -573,6 +652,8 @@ async function executeMaxPowerLLM({ systemInstruction, messagesHistory, userMess
         errors.push(`Gemini ${model}: ${err.message}`);
       }
     }
+  } else {
+    errors.push('Gemini API key is not configured in environment variables (checked GEMINI_API_KEY, GOOGLE_API_KEY, GOOGLE_GENERATIVE_AI_API_KEY, EXPO_PUBLIC_GEMINI_API_KEY).');
   }
 
   return { error: true, errors };
@@ -582,7 +663,7 @@ const CORS_HEADERS = {
   'Content-Type': 'application/json',
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key'
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key, x-openai-api-key, x-anthropic-api-key, x-groq-api-key'
 };
 
 export async function OPTIONS() {
@@ -592,18 +673,20 @@ export async function OPTIONS() {
   });
 }
 
-export async function GET() {
+export async function GET(request) {
+  const keys = getApiKeys(request, {});
+
   return new Response(JSON.stringify({
     status: 'online',
     runtime: 'edge',
     service: 'CouncilX Edge RAG & Sovereign Blueprint Engine',
     providers: {
-      openai: Boolean(process.env.OPENAI_API_KEY),
-      anthropic: Boolean(process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY),
-      deepseek: Boolean(process.env.DEEPSEEK_API_KEY),
-      groq: Boolean(process.env.GROQ_API_KEY),
-      gemini: Boolean(process.env.GEMINI_API_KEY || process.env.EXPO_PUBLIC_GEMINI_API_KEY),
-      tavily: Boolean(process.env.TAVILY_API_KEY)
+      gemini: Boolean(keys.geminiApiKey),
+      openai: Boolean(keys.openaiApiKey),
+      anthropic: Boolean(keys.anthropicApiKey),
+      deepseek: Boolean(keys.deepseekApiKey),
+      groq: Boolean(keys.groqApiKey),
+      tavily: Boolean(keys.tavilyApiKey)
     }
   }), {
     status: 200,
@@ -637,25 +720,40 @@ export async function POST(request) {
       });
     }
 
+    // Explicitly extract all API keys from process.env and fallback headers
+    const keys = getApiKeys(request, body);
+
     // 1. Agentic Real-Time RAG
-    const liveSearchContext = await performAgenticWebSearch(userMessage, agent);
+    const liveSearchContext = await performAgenticWebSearch(userMessage, agent, keys.tavilyApiKey);
 
     // 2. Build Master System Prompt with The Sovereign Blueprint
     const systemInstruction = buildMasterSystemPrompt(agent, language, liveSearchContext);
 
-    // 3. Dispatch to Max-Power LLM
+    // 3. Dispatch to Max-Power LLM with explicitly mapped keys
     const result = await executeMaxPowerLLM({
       systemInstruction,
       messagesHistory: Array.isArray(chatHistory) ? chatHistory : [],
       userMessage,
-      agent
+      agent,
+      keys
     });
 
     if (!result || result.error || !result.reply) {
       console.error('[CouncilX Edge API Error]: All LLM providers failed.', result?.errors);
+      const configuredList = [];
+      if (keys.geminiApiKey) configuredList.push('Gemini');
+      if (keys.openaiApiKey) configuredList.push('OpenAI');
+      if (keys.anthropicApiKey) configuredList.push('Anthropic');
+      if (keys.groqApiKey) configuredList.push('Groq');
+      if (keys.deepseekApiKey) configuredList.push('DeepSeek');
+
+      const configStatus = configuredList.length > 0
+        ? `Configured providers (${configuredList.join(', ')}) failed to return valid response.`
+        : 'No API keys detected in Edge runtime environment. Please set GEMINI_API_KEY (or GOOGLE_API_KEY) in Vercel Project Settings > Environment Variables.';
+
       return new Response(JSON.stringify({
         success: false,
-        error: 'AI Generation Failed: All configured LLM providers (GPT-4o, Claude 3.5 Sonnet, DeepSeek, Groq, Gemini) failed to produce a valid response. Please ensure a valid API key (OPENAI_API_KEY, ANTHROPIC_API_KEY, GROQ_API_KEY, or GEMINI_API_KEY) is configured.',
+        error: `AI Generation Failed: ${configStatus}`,
         details: result?.errors || ['No response generated']
       }), {
         status: 502,
@@ -685,4 +783,10 @@ export async function POST(request) {
       headers: CORS_HEADERS
     });
   }
+}
+
+export default async function handler(request) {
+  if (request.method === 'OPTIONS') return OPTIONS();
+  if (request.method === 'GET') return GET(request);
+  return POST(request);
 }

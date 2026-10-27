@@ -20,6 +20,8 @@ import { i18n, getFullLanguageName } from '../utils/i18n.js';
 const getApiKey = () =>
   process.env.EXPO_PUBLIC_GEMINI_API_KEY ||
   process.env.GEMINI_API_KEY ||
+  process.env.GOOGLE_API_KEY ||
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY ||
   '';
 
 const GEMINI_PROXY_URL = `${process.env.EXPO_PUBLIC_API_BASE_URL || ''}/api/gemini`;
@@ -195,16 +197,22 @@ export const geminiService = {
       CHAT_API_URL,
       '/api/chat',
       '/api/chat/route'
-    ];
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
 
     for (const endpoint of endpoints) {
       try {
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
         const timeoutId = controller ? setTimeout(() => controller.abort(), 55000) : null;
 
+        const clientKey = getApiKey();
+        const headers = { 'Content-Type': 'application/json' };
+        if (clientKey) {
+          headers['x-goog-api-key'] = clientKey;
+        }
+
         const resp = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             agent,
             userMessage,
@@ -214,7 +222,8 @@ export const geminiService = {
             language,
             modelType,
             thinkingDepth,
-            isPremium
+            isPremium,
+            clientApiKey: clientKey || undefined
           }),
           signal: controller ? controller.signal : undefined
         });
