@@ -104,7 +104,8 @@ export default function DebateScreen({ navigation }) {
         ]
       });
     } catch (e) {
-      Alert.alert('Chamber Error', 'Failed to convene the Masterminds debate.');
+      console.error('Debate error:', e);
+      Alert.alert('Chamber Error', e?.message || 'Failed to convene the Masterminds debate. Please check your network and API keys.');
     } finally {
       setLoading(false);
     }

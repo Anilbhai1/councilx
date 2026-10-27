@@ -246,7 +246,7 @@ export default function SyndicateScreen({ route, navigation }) {
       console.error('Supreme council error:', err);
       setLoading(false);
       setIsStreaming(false);
-      Alert.alert('Chamber Interrupted', 'The supreme council deliberation could not connect.');
+      Alert.alert('Chamber Error', err?.message || 'The supreme council deliberation could not connect. Please check your network and API keys.');
     }
   };
 

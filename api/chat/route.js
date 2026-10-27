@@ -1,19 +1,35 @@
 /**
  * COUNCIL X | THE SYNDICATE
  * Modern Route Handler for /api/chat/route.js & /api/chat
- * Delegates to the unified Profound Storytelling & Structured JSON Engine
+ * Delegates to Max-Power Agentic AI RAG & Sovereign Blueprint Engine
  */
 
 const chatHandler = require('../chat');
 
-// Next.js / Edge Route Handler export
 async function handleRequest(request) {
+  if (request.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key'
+      }
+    });
+  }
+
   try {
     let body = {};
-    if (typeof request.json === 'function') {
-      body = await request.json();
-    } else if (typeof request.body === 'object') {
-      body = request.body;
+    if (request.method === 'POST') {
+      if (typeof request.json === 'function') {
+        try {
+          body = await request.json();
+        } catch (e) {
+          body = {};
+        }
+      } else if (typeof request.body === 'object') {
+        body = request.body;
+      }
     }
 
     let responseData = null;
@@ -32,19 +48,24 @@ async function handleRequest(request) {
       end: () => {}
     };
 
-    await chatHandler({ method: 'POST', body }, mockRes);
+    await chatHandler({ method: request.method, body }, mockRes);
 
     return new Response(JSON.stringify(responseData), {
       status: statusCode,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key'
       }
     });
   } catch (err) {
-    return new Response(JSON.stringify({ error: err.message || 'Internal error' }), {
+    return new Response(JSON.stringify({ success: false, error: err.message || 'Internal error' }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      }
     });
   }
 }
@@ -52,3 +73,4 @@ async function handleRequest(request) {
 module.exports = chatHandler;
 module.exports.POST = handleRequest;
 module.exports.GET = handleRequest;
+module.exports.OPTIONS = handleRequest;

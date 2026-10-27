@@ -329,7 +329,7 @@ export default function ChatScreen({ route, navigation }) {
       console.error('Chat error:', err);
       setLoading(false);
       setIsStreaming(false);
-      Alert.alert('Counsel Interrupted', 'The mastermind could not be reached. Please check your network.');
+      Alert.alert('AI Engine Error', err?.message || 'The AI service could not be reached. Please check your network and API keys.');
     }
   };
 
