@@ -199,6 +199,7 @@ export async function POST(request: Request) {
       success: true,
       order_id: rzpOrder.id,
       id: rzpOrder.id,
+      order: { id: rzpOrder.id },
       amount: rzpOrder.amount,
       currency: rzpOrder.currency,
       key_id: keyId

@@ -25,6 +25,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { COLORS } from '../theme/colors';
 import Header from '../components/Header';
+import LiveMarketTicker from '../components/LiveMarketTicker';
 import AgentCard from '../components/AgentCard';
 import CategoryFilter from '../components/CategoryFilter';
 import PaywallModal from '../components/PaywallModal';
@@ -314,6 +315,9 @@ export default function HomeScreen({ navigation }) {
           onOpenHistory={() => navigation.navigate('History')}
           onOpenSettings={() => setProfileModalVisible(true)}
         />
+
+        {/* Real-Time Live Benchmark Indices Ticker */}
+        <LiveMarketTicker onSelectTicker={() => navigation.navigate('Oracle')} />
 
         {/* PRIMARY DUAL SECTION SWITCHER BAR */}
         <View style={styles.sectionSwitcherBar}>

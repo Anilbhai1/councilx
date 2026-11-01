@@ -475,7 +475,8 @@ export default function OracleOfWealthScreen({ navigation }) {
         planName: targetPlan.name
       });
 
-      if (!orderRes || !orderRes.success || !orderRes.order_id) {
+      const finalOrderId = orderRes?.order_id || orderRes?.id || orderRes?.order?.id;
+      if (!orderRes || (!orderRes.success && !finalOrderId) || !finalOrderId) {
         throw new Error(orderRes?.error || 'Could not initiate Razorpay order.');
       }
 
@@ -489,11 +490,11 @@ export default function OracleOfWealthScreen({ navigation }) {
         name: 'Council X | Oracle of Wealth',
         description: `${targetPlan.name} Access`,
         image: 'https://councilx.ai/icon.png',
-        order_id: orderRes.order_id,
+        order_id: finalOrderId,
         handler: async function (response) {
           try {
             const verifyRes = await paymentService.verifyRazorpayPayment({
-              razorpay_order_id: response.razorpay_order_id || orderRes.order_id,
+              razorpay_order_id: response.razorpay_order_id || finalOrderId,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
               planKeyOrType: planTier

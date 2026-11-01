@@ -21,6 +21,7 @@
     "@react-native-async-storage/async-storage": "1.23.1",
     "@supabase/supabase-js": "^2.45.4",
     "ai": "^7.0.159",
+    "next": "^14.2.15",
     "expo": "~51.0.38",
     "expo-clipboard": "~6.0.3",
     "expo-linear-gradient": "~13.0.2",

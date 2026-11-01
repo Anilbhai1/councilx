@@ -166,6 +166,7 @@ module.exports = async function handler(req, res) {
       success: true,
       order_id: rzpOrder.id,
       id: rzpOrder.id,
+      order: { id: rzpOrder.id },
       amount: rzpOrder.amount,
       currency: rzpOrder.currency,
       key_id: keyId

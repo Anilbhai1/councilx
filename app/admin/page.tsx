@@ -4,8 +4,11 @@
  * COUNCIL X | THE SYNDICATE
  * Stealth God Mode Admin Panel (app/admin/page.tsx)
  * 
- * Aesthetic: Pure pitch-black (#050505), brutalist terminal hacker aesthetic, gold (#D4AF37) accents.
- * Security: Submits directly to /api/admin. Returns 404 disguise on incorrect credentials.
+ * Strict Architectural Compliance:
+ * 1. UNCONDITIONAL VISIBILITY: /admin renders the Brutalist Login Form unconditionally.
+ * 2. ZERO notFound() or redirect logic on the /admin landing page.
+ * 3. Authenticates directly against /api/admin using process.env.ADMIN_EMAIL & ADMIN_PASSWORD.
+ * 4. Only protects the inner dashboard view once authenticated via JWT.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -24,17 +27,19 @@ export default function AdminPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [is404, setIs404] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [token, setToken] = useState<string>('');
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [fetchingUsers, setFetchingUsers] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
-  // Check existing session on mount
+  // Restore authenticated session if present
   useEffect(() => {
     try {
-      const savedToken = sessionStorage.getItem('@councilx_admin_jwt') || localStorage.getItem('@councilx_admin_jwt');
+      const savedToken =
+        sessionStorage.getItem('@councilx_admin_jwt') ||
+        localStorage.getItem('@councilx_admin_jwt');
       if (savedToken) {
         setToken(savedToken);
         setIsAuthenticated(true);
@@ -65,8 +70,10 @@ export default function AdminPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMessage(null);
+
     if (!email.trim() || !password.trim()) {
-      setIs404(true);
+      setErrorMessage('EMAIL AND PASSWORD REQUIRED');
       return;
     }
 
@@ -87,8 +94,7 @@ export default function AdminPage() {
       });
 
       if (!res.ok) {
-        // Render 404 disguise on any incorrect credential
-        setIs404(true);
+        setErrorMessage('INVALID MASTER CIPHER - ACCESS DENIED');
         setLoading(false);
         return;
       }
@@ -103,10 +109,10 @@ export default function AdminPage() {
         } catch (e) {}
         fetchUsers(data.token);
       } else {
-        setIs404(true);
+        setErrorMessage('AUTHENTICATION FAILED');
       }
-    } catch (err) {
-      setIs404(true);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'NETWORK TIMEOUT');
     } finally {
       setLoading(false);
     }
@@ -132,7 +138,7 @@ export default function AdminPage() {
         setUsers(prev =>
           prev.map(u => (u.id === userId ? { ...u, is_premium: true, subscription_tier: 'Premium_Lifetime' } : u))
         );
-        setActionMessage(`GOD ACCESS GRANTED: User ${userId} granted Premium_Lifetime.`);
+        setActionMessage(`GOD ACCESS GRANTED: User ${userId} updated to Premium_Lifetime.`);
         setTimeout(() => setActionMessage(null), 4000);
       }
     } catch (e: any) {
@@ -150,20 +156,7 @@ export default function AdminPage() {
     setUsers([]);
   };
 
-  // 1. STEALTH 404 DISGUISE
-  if (is404) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.notFoundBox}>
-          <h1 style={styles.notFoundTitle}>404</h1>
-          <p style={styles.notFoundSubtitle}>This page could not be found.</p>
-          <a href="/" style={styles.backHomeLink}>← Return to Headquarters</a>
-        </div>
-      </div>
-    );
-  }
-
-  // 2. GOD MODE DASHBOARD
+  // 1. INNER DASHBOARD (PROTECTED: Accessible when authenticated via JWT)
   if (isAuthenticated) {
     return (
       <div style={styles.dashboardContainer}>
@@ -267,13 +260,19 @@ export default function AdminPage() {
     );
   }
 
-  // 3. BRUTALIST LOGIN SCREEN
+  // 2. UNCONDITIONAL BRUTALIST LOGIN FORM (Rendered unconditionally at /admin)
   return (
     <div style={styles.container}>
       <div style={styles.loginCard}>
         <div style={styles.terminalIndicator}>[ SECURE ENCLAVE ACCESS ]</div>
         <h1 style={styles.loginHeading}>COUNCIL X</h1>
         <p style={styles.loginSub}>AUTHENTICATE MASTER CLEARANCE</p>
+
+        {errorMessage && (
+          <div style={styles.errorAlert}>
+            ⚠️ {errorMessage}
+          </div>
+        )}
 
         <form onSubmit={handleLogin} style={styles.form}>
           <div style={styles.inputGroup}>
@@ -347,6 +346,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: '11px',
     letterSpacing: '1px',
     marginBottom: '28px'
+  },
+  errorAlert: {
+    backgroundColor: '#260B0B',
+    border: '1px solid #FF4444',
+    color: '#FF6666',
+    padding: '10px 14px',
+    fontSize: '11px',
+    letterSpacing: '1px',
+    marginBottom: '20px'
   },
   form: {
     display: 'flex',
@@ -552,27 +560,5 @@ const styles: Record<string, React.CSSProperties> = {
     textAlign: 'center',
     color: '#666',
     fontSize: '12px'
-  },
-  notFoundBox: {
-    textAlign: 'center'
-  },
-  notFoundTitle: {
-    color: '#FFFFFF',
-    fontSize: '64px',
-    margin: '0 0 10px 0',
-    letterSpacing: '4px'
-  },
-  notFoundSubtitle: {
-    color: '#777777',
-    fontSize: '14px',
-    marginBottom: '24px',
-    letterSpacing: '1px'
-  },
-  backHomeLink: {
-    color: '#D4AF37',
-    textDecoration: 'none',
-    fontSize: '12px',
-    letterSpacing: '1px',
-    borderBottom: '1px dotted #D4AF37'
   }
 };

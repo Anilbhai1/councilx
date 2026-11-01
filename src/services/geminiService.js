@@ -34,6 +34,8 @@ export const geminiService = {
   async fetchLiveMarketOverview() {
     const base = getApiBaseUrl();
     const endpoints = [
+      `${base}/api/ticker`,
+      '/api/ticker',
       `${base}/api/oracle?overview=true`,
       '/api/oracle?overview=true'
     ].filter((v, i, a) => v && a.indexOf(v) === i);
@@ -46,8 +48,9 @@ export const geminiService = {
         });
         if (resp.ok) {
           const data = await resp.json();
-          if (data && Array.isArray(data.macroOverview)) {
-            return data.macroOverview;
+          const list = data?.ticker || data?.indices || data?.macroOverview;
+          if (Array.isArray(list) && list.length > 0) {
+            return list;
           }
         }
       } catch (e) {
@@ -124,6 +127,20 @@ export const geminiService = {
 
     let lastError = null;
 
+    const formattedMessages = Array.isArray(chatHistory)
+      ? chatHistory.map(m => ({
+          role: (m.role === 'model' || m.role === 'assistant') ? 'assistant' : 'user',
+          content: m.content || m.text || m.parts?.[0]?.text || ''
+        }))
+      : [];
+
+    if (userMessage) {
+      formattedMessages.push({
+        role: 'user',
+        content: typeof userMessage === 'string' ? userMessage : JSON.stringify(userMessage)
+      });
+    }
+
     for (const endpoint of endpoints) {
       try {
         const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
@@ -135,10 +152,17 @@ export const geminiService = {
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            agent,
+            messages: formattedMessages,
             userMessage,
+            data: {
+              agent,
+              feature,
+              mode: mode || (feature ? 'oracle_of_wealth' : 'single'),
+              language,
+              reportContext
+            },
+            agent,
             chatHistory,
-            messages: chatHistory,
             chat_id: activeChatId,
             language,
             modelType,
@@ -153,30 +177,50 @@ export const geminiService = {
 
         if (timeoutId) clearTimeout(timeoutId);
 
-        const data = await resp.json().catch(() => null);
+        if (resp.ok) {
+          const rawText = await resp.text();
+          let replyText = '';
+          let jsonParsed = null;
+          try {
+            jsonParsed = JSON.parse(rawText);
+          } catch (e) {}
 
-        if (resp.ok && data && (data.reply || data.content)) {
-          const reply = (data.reply || data.content).trim();
-          const followUps = Array.isArray(data.follow_ups) && data.follow_ups.length > 0
-            ? data.follow_ups
-            : (Array.isArray(data.followUpQuestions) ? data.followUpQuestions : []);
-
-          return {
-            reply,
-            follow_ups: followUps,
-            content: reply,
-            followUpQuestions: followUps,
-            model: data.model,
-            liveMarketData: data.liveMarketData || null
-          };
-        } else if (!resp.ok) {
-          if (resp.status === 504) {
-            lastError = new Error('Gateway Timeout (504): The deep research analysis exceeded execution timeout.');
-          } else if (data && data.error) {
-            lastError = new Error(data.error);
-          } else {
-            lastError = new Error(`Server returned error status (${resp.status})`);
+          if (jsonParsed && (jsonParsed.reply || jsonParsed.content || jsonParsed.text)) {
+            replyText = (jsonParsed.reply || jsonParsed.content || jsonParsed.text).trim();
+          } else if (rawText) {
+            const lines = rawText.split('\n');
+            for (const line of lines) {
+              if (line.startsWith('0:')) {
+                try {
+                  replyText += JSON.parse(line.slice(2));
+                } catch (e) {
+                  replyText += line.slice(2).replace(/^"/, '').replace(/"$/, '');
+                }
+              }
+            }
+            if (!replyText.trim()) {
+              replyText = rawText.trim();
+            }
           }
+
+          if (replyText) {
+            const followUps = [
+              'What is the institutional stop-loss for this setup?',
+              'How does current promoter integrity impact the upside?',
+              'Simulate a -10% market crash scenario on this strategy.'
+            ];
+
+            return {
+              reply: replyText,
+              follow_ups: followUps,
+              content: replyText,
+              followUpQuestions: followUps,
+              model: 'gemini-1.5-pro'
+            };
+          }
+        } else {
+          const errData = await resp.json().catch(() => null);
+          lastError = new Error(errData?.error || `Server returned error status (${resp.status})`);
         }
       } catch (callErr) {
         if (callErr.name === 'AbortError') {

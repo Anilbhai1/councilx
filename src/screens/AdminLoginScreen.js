@@ -29,27 +29,12 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [is404, setIs404] = useState(false);
-
-  // If wrong credentials or stealth 404 triggered, render true 404 Page Not Found
-  if (is404) {
-    return (
-      <NotFoundScreen
-        navigation={navigation}
-        onGoHome={() => {
-          setIs404(false);
-          if (navigation && navigation.navigate) {
-            navigation.navigate('Home');
-          }
-        }}
-      />
-    );
-  }
+  const [errorMessage, setErrorMessage] = useState('');
 
   const handleAuthenticate = async () => {
+    setErrorMessage('');
     if (!email.trim() || !password.trim()) {
-      // Any empty/incomplete submission immediately triggers 404 disguise
-      setIs404(true);
+      setErrorMessage('EMAIL AND MASTER CIPHER REQUIRED');
       return;
     }
 
@@ -77,8 +62,7 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
       });
 
       if (!response.ok) {
-        // Any failure (404, 401, 500) renders 404 component immediately
-        setIs404(true);
+        setErrorMessage('ACCESS DENIED: INVALID MASTER CREDENTIALS');
         setLoading(false);
         return;
       }
@@ -105,11 +89,10 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
           navigation.navigate('AdminDashboard');
         }
       } else {
-        setIs404(true);
+        setErrorMessage('AUTHENTICATION FAILED');
       }
     } catch (err) {
-      // Network error or failure triggers 404 disguise
-      setIs404(true);
+      setErrorMessage('NETWORK ERROR: UNABLE TO REACH ENCLAVE');
     } finally {
       setLoading(false);
     }
@@ -132,6 +115,14 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
           </View>
 
           <View style={styles.divider} />
+
+          {Boolean(errorMessage) && (
+            <View style={{ backgroundColor: '#260B0B', borderWidth: 1, borderColor: '#FF4444', padding: 10, marginBottom: 16 }}>
+              <Text style={{ color: '#FF6666', fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace', fontSize: 11, letterSpacing: 1 }}>
+                ⚠️ {errorMessage}
+              </Text>
+            </View>
+          )}
 
           {/* Form */}
           <View style={styles.form}>
