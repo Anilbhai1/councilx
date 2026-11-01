@@ -1,10 +1,7 @@
-export const runtime = 'edge';
-export const config = { runtime: 'edge' };
-
 /**
  * COUNCIL X | THE SYNDICATE
  * MAX-POWER AGENTIC CHAT API BACKEND
- * Runtime: Edge Function (Exempt from Vercel Hobby 12 Serverless Function limit)
+ * Runtime: Standard Node.js Serverless Function (Supports yahoo-finance2, crypto & Node built-ins)
  * 
  * 1. ZERO HARDCODED FALLBACKS:
  *    - All mock/static responses and static follow-up question candidate lists nuked.
@@ -33,7 +30,7 @@ try {
 } catch (e) {
   try {
     getLiveFinancialContext = require('./finance').getLiveFinancialContext;
-  } catch (e2) {}
+  } catch (e2) { }
 }
 
 /**
@@ -287,11 +284,11 @@ function buildMasterSystemPrompt(agent = {}, language = 'gu', liveSearchContext 
   const mode = options.mode || (feature ? 'oracle_of_wealth' : 'single');
   const reportContext = options.reportContext || '';
 
-  const isOracleOfWealth = mode === 'oracle_of_wealth' || 
-    Boolean(feature) || 
-    agent.category === 'Wealth' || 
-    agent.category === 'Stock Market' || 
-    agent.category === 'Finance' || 
+  const isOracleOfWealth = mode === 'oracle_of_wealth' ||
+    Boolean(feature) ||
+    agent.category === 'Wealth' ||
+    agent.category === 'Stock Market' ||
+    agent.category === 'Finance' ||
     agentName.toLowerCase().includes('oracle') ||
     agentName.toLowerCase().includes('wealth');
 
@@ -761,7 +758,7 @@ async function executeMaxPowerLLM({
             }
           }
         }
-      } catch (err) {}
+      } catch (err) { }
 
       // Try 2: without tools & with JSON mode
       try {
@@ -886,11 +883,11 @@ module.exports = async function handler(req, res) {
     const feature = body.feature || '';
     const reportContext = body.reportContext || '';
 
-    const isOracleOfWealth = mode === 'oracle_of_wealth' || 
-      Boolean(feature) || 
-      agent?.category === 'Wealth' || 
-      agent?.category === 'Stock Market' || 
-      agent?.category === 'Finance' || 
+    const isOracleOfWealth = mode === 'oracle_of_wealth' ||
+      Boolean(feature) ||
+      agent?.category === 'Wealth' ||
+      agent?.category === 'Stock Market' ||
+      agent?.category === 'Finance' ||
       (agent?.name || '').toLowerCase().includes('oracle') ||
       (agent?.name || '').toLowerCase().includes('wealth');
 

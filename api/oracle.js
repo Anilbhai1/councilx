@@ -1,18 +1,13 @@
-export const runtime = 'edge';
-export const config = { runtime: 'edge' };
-
 /**
  * COUNCIL X | THE SYNDICATE
- * ORACLE OF WEALTH BACKEND ROUTE HANDLER
- * Runtime: Edge Function (Exempt from Vercel Hobby 12 Serverless Function limit)
+ * Consolidated Oracle of Wealth Backend Handler (/api/oracle)
+ * Runtime: Standard Node.js (Consolidates all Oracle feature actions via switch statement)
  * 
- * 1. REAL LIVE DATA INTEGRATION (yahoo-finance2)
- *    - Real-time stock quotes, financials, macro overview.
- *    - Zero mock data or dummy placeholders.
- * 2. SECURE BACKEND ROUTING:
- *    - Server-side environment variable initialization:
- *      apiKey: process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY
- *    - Full persona isolation & A-to-Z Masterclass doctrine.
+ * Supported Actions:
+ * - 'overview': Live macro market overview (Nifty 50, Sensex, Bank Nifty, Crude, Gold, USD/INR)
+ * - 'quote' / 'ticker': Real-time stock telemetry, OHLC, volume, and valuation
+ * - 'financials' / 'xray': Forensic balance sheet scan and institutional telemetry
+ * - 'audit' / 'chat': Oracle of Wealth 8 Master Features AI Consultation
  */
 
 let financeModule = null;
@@ -37,29 +32,74 @@ module.exports = async function handler(req, res) {
     return res.status(200).end();
   }
 
-  // GET: Fetch pure real-time live market telemetry asynchronously
+  // GET: Fetch pure real-time live market telemetry asynchronously via action switch
   if (req.method === 'GET') {
     try {
-      const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
-      const isOverview = url.searchParams.get('overview') === 'true';
+      const url = new URL(req.url, `http://${req?.headers?.host || 'localhost'}`);
+      const action = (url.searchParams.get('action') || (url.searchParams.get('overview') === 'true' ? 'overview' : 'quote')).toLowerCase().trim();
       const ticker = url.searchParams.get('ticker') || url.searchParams.get('query') || url.searchParams.get('q') || '';
 
-      if (isOverview || !ticker) {
-        const macroOverview = await getLiveMarketOverview();
-        return res.status(200).json({
-          success: true,
-          macroOverview,
-          timestamp: new Date().toISOString()
-        });
-      }
+      switch (action) {
+        case 'overview': {
+          const macroOverview = await getLiveMarketOverview();
+          return res.status(200).json({
+            success: true,
+            action: 'overview',
+            macroOverview,
+            timestamp: new Date().toISOString()
+          });
+        }
 
-      const financialContext = await getLiveFinancialContext(ticker);
-      return res.status(200).json({
-        success: true,
-        liveMarketData: financialContext.liveMarketData,
-        macroOverview: financialContext.macroOverview,
-        timestamp: new Date().toISOString()
-      });
+        case 'quote': {
+          if (!ticker) {
+            const macroOverview = await getLiveMarketOverview();
+            return res.status(200).json({
+              success: true,
+              action: 'overview',
+              macroOverview,
+              timestamp: new Date().toISOString()
+            });
+          }
+          const quote = await getLiveStockQuote(ticker);
+          return res.status(200).json({
+            success: true,
+            action: 'quote',
+            ticker,
+            quote,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        case 'financials':
+        case 'xray': {
+          const financialContext = await getLiveFinancialContext(ticker || '^NSEI');
+          return res.status(200).json({
+            success: true,
+            action: 'financials',
+            liveMarketData: financialContext.liveMarketData,
+            macroOverview: financialContext.macroOverview,
+            timestamp: new Date().toISOString()
+          });
+        }
+
+        default: {
+          if (ticker) {
+            const financialContext = await getLiveFinancialContext(ticker);
+            return res.status(200).json({
+              success: true,
+              liveMarketData: financialContext.liveMarketData,
+              macroOverview: financialContext.macroOverview,
+              timestamp: new Date().toISOString()
+            });
+          }
+          const macroOverview = await getLiveMarketOverview();
+          return res.status(200).json({
+            success: true,
+            macroOverview,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
     } catch (err) {
       console.error('[Oracle API GET Error]:', err);
       return res.status(500).json({
@@ -69,7 +109,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // POST: Execute Oracle of Wealth AI Audit with verified live market data
+  // POST: Execute Oracle AI consultation or specific action
   if (req.method === 'POST') {
     let body = req.body;
     if (typeof body === 'string') {
@@ -77,7 +117,18 @@ module.exports = async function handler(req, res) {
     }
     body = body || {};
 
-    // Forward to max-power chat handler with forced oracle_of_wealth mode
+    const action = String(body.action || '').toLowerCase().trim();
+
+    if (action === 'overview') {
+      const macroOverview = await getLiveMarketOverview();
+      return res.status(200).json({
+        success: true,
+        action: 'overview',
+        macroOverview
+      });
+    }
+
+    // Forward to chat handler with forced oracle_of_wealth mode
     req.body = {
       ...body,
       mode: 'oracle_of_wealth',

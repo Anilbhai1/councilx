@@ -90,3 +90,4 @@ export async function POST(request, { params }) {
   await adminHandler(req, res);
   return res.toResponse();
 }
+

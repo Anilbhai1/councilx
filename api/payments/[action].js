@@ -403,7 +403,7 @@ module.exports = async function handler(req, res) {
                 isAuthentic = true;
               }
             }
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (!isAuthentic) {
@@ -461,3 +461,4 @@ module.exports = async function handler(req, res) {
       return res.status(404).json({ success: false, error: `Unknown payment action: ${action}` });
   }
 };
+
