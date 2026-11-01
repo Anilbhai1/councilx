@@ -4,19 +4,20 @@ export const maxDuration = 60;
 
 /**
  * COUNCIL X | THE SYNDICATE
- * Consolidated Oracle of Wealth Route Handler (app/api/oracle/route.js)
- * Runtime: Standard Node.js
+ * Rebuilt Oracle Engine (app/api/oracle/route.ts)
+ * Runtime: Standard Node.js (Required for yahoo-finance2 module)
  * 
  * Strict Architectural Compliance:
  * 1. Explicit Gemini API key initialization via @ai-sdk/google:
+ *    import { createGoogleGenerativeAI } from '@ai-sdk/google';
  *    const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
- * 2. Try/Catch wrapped AI generation with console.error and clean 500 JSON error handling.
+ * 2. Real-time live market telemetry fetching (Yahoo Finance / NSE / BSE).
  * 3. Enforces the 4-part A-to-Z Masterclass framework:
  *    - The Verdict (Institutional truth)
  *    - The 'Why' (Deep logic & balance sheet forensic metrics)
  *    - The 'Why Not' (Trap avoidance & retail hazard protection)
  *    - The Final Strategic Move (Numbered entry, stop-loss, targets)
- * 4. Real-time live market telemetry fetching (Yahoo Finance / NSE / BSE)
+ * 4. Try/Catch wrapped AI generation with console.error and clean 500 JSON error handling.
  */
 
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
@@ -50,9 +51,8 @@ export async function OPTIONS() {
 
 /**
  * GET /api/oracle?action=[overview|quote|financials]&ticker=...
- * Consolidated Oracle GET Switch Router
  */
-export async function GET(request) {
+export async function GET(request: Request) {
   try {
     const finance = getFinanceModule();
     const getLiveFinancialContext = finance?.getLiveFinancialContext || (async () => ({}));
@@ -147,11 +147,11 @@ export async function GET(request) {
         });
       }
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Oracle Route GET Error]:', err);
     return new Response(JSON.stringify({
       success: false,
-      error: err.message || 'Failed to fetch Oracle market telemetry.'
+      error: err?.message || 'Failed to fetch Oracle market telemetry.'
     }), {
       status: 500,
       headers: CORS_HEADERS
@@ -161,11 +161,11 @@ export async function GET(request) {
 
 /**
  * POST /api/oracle
- * Consolidated Oracle POST Switch Router (Stock Analysis & AI Deliberation)
+ * Stock Analysis & Oracle AI Consultation
  */
-export async function POST(request) {
+export async function POST(request: Request) {
   try {
-    let body = {};
+    let body: any = {};
     try {
       body = await request.json();
     } catch (e) {
@@ -189,7 +189,7 @@ export async function POST(request) {
       });
     }
 
-    // 2. Action: Stock Quote only
+    // 2. Action: Stock Quote
     if (action === 'quote' && (body.ticker || body.query)) {
       const finance = getFinanceModule();
       const quote = await (finance?.getLiveStockQuote || (async () => null))(body.ticker || body.query);
@@ -218,7 +218,7 @@ export async function POST(request) {
     const language = body.language || 'gu';
     const agent = body.agent || {};
 
-    // Explicit Gemini API Key Mapping (Strict Requirement)
+    // Explicitly pass process.env.GEMINI_API_KEY to AI SDK
     const geminiApiKey = (
       process.env.GEMINI_API_KEY ||
       process.env.GOOGLE_API_KEY ||
@@ -228,7 +228,7 @@ export async function POST(request) {
     ).trim();
 
     if (!geminiApiKey) {
-      console.error('[Oracle Route Error]: GEMINI_API_KEY is not defined in environment variables.');
+      console.error('[Oracle Route Error]: process.env.GEMINI_API_KEY is not defined in environment variables.');
       return new Response(JSON.stringify({
         success: false,
         error: 'Gemini API key is not initialized in backend environment (GEMINI_API_KEY).'
@@ -238,14 +238,14 @@ export async function POST(request) {
       });
     }
 
-    // Explicitly initialize Google Generative AI with the mapped key
+    // Initialize Google Generative AI explicitly
     const google = createGoogleGenerativeAI({
       apiKey: geminiApiKey,
     });
 
-    // Fetch live market data for the stock query if relevant
-    let liveMarketData = null;
-    let tickerCandidate = rawQuery.replace(/^(analyze|check|what about|audit|scan)\s+/i, '').trim();
+    // Fetch live market telemetry for the queried stock
+    let liveMarketData: any = null;
+    const tickerCandidate = rawQuery.replace(/^(analyze|check|what about|audit|scan)\s+/i, '').trim();
 
     try {
       const finance = getFinanceModule();
@@ -253,11 +253,10 @@ export async function POST(request) {
         const financialContext = await finance.getLiveFinancialContext(tickerCandidate);
         liveMarketData = financialContext?.liveMarketData || null;
       }
-    } catch (finErr) {
-      console.warn('[Oracle Route]: Notice fetching live stock quote:', finErr.message);
+    } catch (finErr: any) {
+      console.warn('[Oracle Route]: Live telemetry fetch notice:', finErr?.message);
     }
 
-    // Construct enriched institutional telemetry context
     let liveMetricsSummary = 'No real-time market quote available for this query.';
     if (liveMarketData) {
       liveMetricsSummary = `
@@ -277,7 +276,7 @@ LIVE MARKET TELEMETRY (REAL-TIME EXCHANGE DATA):
 `;
     }
 
-    const featureNames = {
+    const featureNames: Record<string, string> = {
       pre_market: 'Pre-Market Prophecy (સવારની રણનીતિ)',
       xray: 'Syndicate X-Ray (બેલેન્સ શીટ ફોરેન્સિક ઓડિટ)',
       fo_deathmatch: 'F&O Deathmatch (ઓપ્શન્સ ઓપન ઇન્ટરેસ્ટ અને મેક્સ પેઇન)',
@@ -323,7 +322,7 @@ Execute the A-to-Z Masterclass Financial Audit now following the 4 mandatory sec
     try {
       let aiReportText = '';
       const modelsToTry = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash'];
-      let lastModelError = null;
+      let lastModelError: any = null;
 
       for (const modelId of modelsToTry) {
         try {
@@ -337,9 +336,9 @@ Execute the A-to-Z Masterclass Financial Audit now following the 4 mandatory sec
             aiReportText = text.trim();
             break;
           }
-        } catch (mErr) {
+        } catch (mErr: any) {
           lastModelError = mErr;
-          console.warn(`[Oracle AI] Model ${modelId} attempt notice:`, mErr.message);
+          console.warn(`[Oracle AI] Model ${modelId} attempt notice:`, mErr?.message);
         }
       }
 
@@ -374,21 +373,21 @@ Execute the A-to-Z Masterclass Financial Audit now following the 4 mandatory sec
         status: 200,
         headers: CORS_HEADERS
       });
-    } catch (aiExecutionError) {
+    } catch (aiExecutionError: any) {
       console.error('[Oracle Gemini API Error]: Execution error during generateText:', aiExecutionError);
       return new Response(JSON.stringify({
         success: false,
-        error: `Gemini API Error: ${aiExecutionError.message || 'Execution error in Gemini AI'}`
+        error: `Gemini API Error: ${aiExecutionError?.message || 'Execution error in Gemini AI'}`
       }), {
         status: 500,
         headers: CORS_HEADERS
       });
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('[Oracle Route POST Exception]:', err);
     return new Response(JSON.stringify({
       success: false,
-      error: `Gemini API Error: ${err.message || 'Internal server error in Oracle Route'}`
+      error: `Gemini API Error: ${err?.message || 'Internal server error in Oracle Route'}`
     }), {
       status: 500,
       headers: CORS_HEADERS

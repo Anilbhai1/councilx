@@ -35,9 +35,8 @@ export const geminiService = {
     const base = getApiBaseUrl();
     const endpoints = [
       `${base}/api/oracle?overview=true`,
-      '/api/oracle?overview=true',
-      '/api/oracle/route?overview=true'
-    ];
+      '/api/oracle?overview=true'
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
 
     for (const ep of endpoints) {
       try {
@@ -67,9 +66,8 @@ export const geminiService = {
     const clean = encodeURIComponent(tickerOrQuery.trim());
     const endpoints = [
       `${base}/api/oracle?ticker=${clean}`,
-      `/api/oracle?ticker=${clean}`,
-      `/api/oracle/route?ticker=${clean}`
-    ];
+      `/api/oracle?ticker=${clean}`
+    ].filter((v, i, a) => v && a.indexOf(v) === i);
 
     for (const ep of endpoints) {
       try {
@@ -110,22 +108,15 @@ export const geminiService = {
     const isOracle = mode === 'oracle_of_wealth' || Boolean(feature);
     const base = getApiBaseUrl();
 
-    // Prefer dedicated /api/oracle endpoint when in Oracle of Wealth mode
+    // Dedicated /api/oracle endpoint when in Oracle of Wealth mode
     const candidateEndpoints = isOracle
       ? [
           `${base}/api/oracle`,
-          '/api/oracle',
-          '/api/oracle/route',
-          `${base}/api/chat`,
-          '/api/chat',
-          '/api/chat/route'
+          '/api/oracle'
         ]
       : [
           `${base}/api/chat`,
-          '/api/chat',
-          '/api/chat/route',
-          `${base}/api/gemini`,
-          '/api/gemini'
+          '/api/chat'
         ];
 
     // Remove duplicates

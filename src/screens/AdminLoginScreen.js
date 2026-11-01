@@ -62,7 +62,7 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
           ? ''
           : 'http://localhost:3001';
 
-      const response = await fetch(`${baseUrl}/api/admin/login`, {
+      const response = await fetch(`${baseUrl}/api/admin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -70,6 +70,7 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
         },
         credentials: 'include',
         body: JSON.stringify({
+          action: 'login',
           email: email.trim(),
           password: password.trim()
         })

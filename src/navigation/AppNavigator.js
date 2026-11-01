@@ -48,7 +48,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
           token =
             window.sessionStorage?.getItem('@councilx_admin_jwt') ||
             window.localStorage?.getItem('@councilx_admin_jwt');
-        } catch (e) {}
+        } catch (e) { }
         return token ? 'AdminDashboard' : 'NotFound';
       }
 
@@ -65,7 +65,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
           token =
             window.sessionStorage?.getItem('@councilx_admin_jwt') ||
             window.localStorage?.getItem('@councilx_admin_jwt');
-        } catch (e) {}
+        } catch (e) { }
         return token ? 'AdminDashboard' : 'AdminLogin';
       }
 

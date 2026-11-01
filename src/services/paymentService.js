@@ -1231,10 +1231,10 @@ export const paymentService = {
     try {
       if (typeof window !== 'undefined' && window.fetch) {
         const candidateEndpoints = [
+          `${baseUrl}/api/payment`,
+          '/api/payment',
           `${baseUrl}/api/payment/create-order`,
-          `${baseUrl}/api/payments/create-order`,
-          '/api/payment/create-order',
-          '/api/payments/create-order'
+          '/api/payment/create-order'
         ].filter((v, i, a) => v && a.indexOf(v) === i);
 
         let lastError = null;
@@ -1331,34 +1331,28 @@ export const paymentService = {
     try {
       if (typeof window !== 'undefined' && window.fetch) {
         let res;
-        try {
-          res = await window.fetch(`${baseUrl}/api/payments/verify-payment`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_payment_id,
-              razorpay_order_id,
-              razorpay_signature,
-              user_id: userId,
-              plan_id,
-              amount,
-              isAnnual
-            })
-          });
-        } catch (fetchErr) {
-          res = await window.fetch('/api/payments/verify-payment', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              razorpay_payment_id,
-              razorpay_order_id,
-              razorpay_signature,
-              user_id: userId,
-              plan_id,
-              amount,
-              isAnnual
-            })
-          });
+        const verifyEndpoints = [
+          `${baseUrl}/api/payment`,
+          '/api/payment'
+        ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+        for (const vEp of verifyEndpoints) {
+          try {
+            res = await window.fetch(vEp, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                action: 'verify',
+                razorpay_payment_id,
+                razorpay_order_id,
+                razorpay_signature,
+                userId,
+                planTier: plan_id,
+                planKeyOrType: plan_id
+              })
+            });
+            if (res && res.ok) break;
+          } catch (vErr) {}
         }
 
         if (res.ok) {

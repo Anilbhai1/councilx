@@ -74,7 +74,7 @@ export default function GodModeDashboardScreen({ navigation, onLogout }) {
       }
 
       const baseUrl = getBaseUrl();
-      const response = await fetch(`${baseUrl}/api/admin/users`, {
+      const response = await fetch(`${baseUrl}/api/admin?action=users`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -136,7 +136,7 @@ export default function GodModeDashboardScreen({ navigation, onLogout }) {
       const token = await getAuthToken();
       const baseUrl = getBaseUrl();
 
-      const response = await fetch(`${baseUrl}/api/admin/override`, {
+      const response = await fetch(`${baseUrl}/api/admin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -144,10 +144,10 @@ export default function GodModeDashboardScreen({ navigation, onLogout }) {
         },
         credentials: 'include',
         body: JSON.stringify({
+          action: 'override',
           userId: user.id,
           email: user.originalEmail || user.email,
-          overrideStatus: 'Premium_Lifetime',
-          action
+          overrideStatus: 'Premium_Lifetime'
         })
       });
 
@@ -204,7 +204,7 @@ export default function GodModeDashboardScreen({ navigation, onLogout }) {
       const token = await getAuthToken();
       const baseUrl = getBaseUrl();
 
-      const response = await fetch(`${baseUrl}/api/admin/override`, {
+      const response = await fetch(`${baseUrl}/api/admin`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -212,9 +212,9 @@ export default function GodModeDashboardScreen({ navigation, onLogout }) {
         },
         credentials: 'include',
         body: JSON.stringify({
+          action: 'override',
           email: target,
-          overrideStatus: 'Premium_Lifetime',
-          action: 'grant'
+          overrideStatus: 'Premium_Lifetime'
         })
       });
 
