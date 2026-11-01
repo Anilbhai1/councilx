@@ -517,23 +517,6 @@ export default function ProfileModal({ visible, onClose, onOpenPaywall, onOpenPr
               )}
             </View>
 
-            {/* Sovereign Admin Terminal Shortcut (Exclusively for arshitchodavadiya@gmail.com) */}
-            {userEmail?.toLowerCase() === 'arshitchodavadiya@gmail.com' ? (
-              <TouchableOpacity
-                style={styles.adminTerminalBtn}
-                onPress={() => {
-                  onClose?.();
-                  navigation?.navigate('Admin');
-                }}
-                activeOpacity={0.85}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Ionicons name="shield-checkmark" size={16} color="#00F0FF" />
-                  <Text style={styles.adminTerminalBtnText}>⚡ OPEN SOVEREIGN ADMIN TERMINAL</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={14} color="#00F0FF" />
-              </TouchableOpacity>
-            ) : null}
 
             {/* 5. Terms & Conditions Modal Link */}
             <TouchableOpacity

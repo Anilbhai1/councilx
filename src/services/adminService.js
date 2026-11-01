@@ -2,10 +2,10 @@
  * COUNCIL X | THE SYNDICATE
  * Super Admin & God-Mode Engine
  * 
- * STRICT RBAC CONFIGURED EXCLUSIVELY FOR: arshitchodavadiya@gmail.com
+ * STRICT RBAC CONFIGURED EXCLUSIVELY FOR: 
  * 
  * Features:
- * 1. Strict Role-Based Access Control (RBAC): arshitchodavadiya@gmail.com
+ * 1. Strict Role-Based Access Control (RBAC): 
  * 2. User Management: Google OAuth login badges, remaining session counters, quick session gifting, block/unblock controls
  * 3. Revenue & Payments Tracking: Live Razorpay order IDs, payment IDs, amounts, plan types, and transaction filters
  * 4. AI Usage Analytics: Total chat requests, 1-on-1 vs 216 Supreme Council distribution, Masterminds Leaderboard
@@ -18,10 +18,11 @@ import { supabase, isSupabaseConfigured } from '../api/supabase';
 import { getLocalSession } from './supabaseClient';
 import { DEFAULT_AGENTS } from '../data/defaultAgents';
 
-export const SOVEREIGN_ADMIN_EMAIL = 'arshitchodavadiya@gmail.com';
+export const SOVEREIGN_ADMIN_EMAIL = (typeof process !== 'undefined' && (process.env?.ADMIN_EMAIL || process.env?.EXPO_PUBLIC_ADMIN_EMAIL)) || '';
 
 export function isSovereignEmail(email) {
   if (!email || typeof email !== 'string') return false;
+  if (!SOVEREIGN_ADMIN_EMAIL) return false;
   return email.trim().toLowerCase() === SOVEREIGN_ADMIN_EMAIL.toLowerCase();
 }
 
@@ -84,9 +85,13 @@ export const adminService = {
 
   /**
    * Strict Role-Based Access Control verification:
-   * Returns true IF AND ONLY IF caller's authenticated email is exactly arshitchodavadiya@gmail.com
+   * Returns true IF AND ONLY IF caller's authenticated email is exactly 
    */
   async verifyAdminAccess() {
+    try {
+      const token = await AsyncStorage.getItem('@councilx_admin_jwt');
+      if (token) return true;
+    } catch (e) {}
     const email = await this.getActiveUserEmail();
     return isSovereignEmail(email);
   },

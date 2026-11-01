@@ -1,10 +1,18 @@
 /**
  * COUNCIL X | THE SYNDICATE
- * Standalone Local Backend Server for Razorpay Serverless Handlers
+ * Standalone Local Backend Server for Serverless Handlers
  * 
  * Runs on port 3001 (or process.env.PORT) to serve:
  * - POST /api/create-order
  * - POST /api/verify-payment
+ * - POST /api/create-subscription
+ * - POST /api/verify-subscription
+ * - POST /api/chat
+ * - POST /api/oracle
+ * - POST /api/admin/login
+ * - GET/POST /api/admin/users
+ * - POST /api/admin/override
+ * - GET/POST /api/admin/verify
  * 
  * Uses built-in Node.js 'http' and 'fs' modules so zero extra dependencies are needed.
  */
@@ -38,6 +46,10 @@ const createSubscriptionHandler = require('../api/create-subscription');
 const verifySubscriptionHandler = require('../api/verify-subscription');
 const chatHandler = require('../api/chat');
 const oracleHandler = require('../api/oracle');
+const adminLoginHandler = require('../api/admin/login');
+const adminUsersHandler = require('../api/admin/users');
+const adminOverrideHandler = require('../api/admin/override');
+const adminVerifyHandler = require('../api/admin/verify');
 
 const PORT = process.env.PORT || 3001;
 
@@ -45,7 +57,8 @@ const server = http.createServer((req, res) => {
   // CORS Headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-admin-token');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
 
   if (req.method === 'OPTIONS') {
     res.writeHead(200);
@@ -113,10 +126,35 @@ const server = http.createServer((req, res) => {
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }
+    } else if (url === '/api/admin/login') {
+      try {
+        await adminLoginHandler(req, res);
+      } catch (err) {
+        res.status(404).json({ error: 'Cannot POST /api/admin/login' });
+      }
+    } else if (url === '/api/admin/users') {
+      try {
+        await adminUsersHandler(req, res);
+      } catch (err) {
+        res.status(404).json({ error: 'Cannot GET /api/admin/users' });
+      }
+    } else if (url === '/api/admin/override') {
+      try {
+        await adminOverrideHandler(req, res);
+      } catch (err) {
+        res.status(404).json({ error: 'Cannot POST /api/admin/override' });
+      }
+    } else if (url === '/api/admin/verify') {
+      try {
+        await adminVerifyHandler(req, res);
+      } catch (err) {
+        res.status(404).json({ error: 'Cannot GET /api/admin/verify' });
+      }
     } else if (url === '/health' || url === '/') {
       res.status(200).json({
         status: 'online',
         service: 'CouncilX Backend Serverless Gateway',
+        adminAuthConfigured: Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD),
         razorpayKeyIdConfigured: Boolean(process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID),
         razorpaySecretConfigured: Boolean(process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== 'your_razorpay_key_secret_here')
       });
@@ -147,6 +185,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`[CouncilX] Backend serverless gateway running at http://localhost:${PORT}`);
+  console.log(`[CouncilX] Stealth Admin: ${process.env.ADMIN_EMAIL ? 'CONFIGURED' : 'PENDING'}`);
   console.log(`[CouncilX] Razorpay Key ID: ${process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC'}`);
   console.log(`[CouncilX] Secret Key Present: ${Boolean(process.env.RAZORPAY_KEY_SECRET)}`);
 });

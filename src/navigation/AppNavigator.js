@@ -1,15 +1,17 @@
 /**
  * COUNCIL X | THE SYNDICATE
  * Application Navigation Controller
- * Manages Google Auth, Home, 1-on-1 Chat, 216 Supreme Council, History & Compliance
+ * Manages Auth, Home, 1-on-1 Chat, 216 Supreme Council, History, Compliance & Stealth Admin
  * 
- * STRICT RBAC ROUTING:
- * /admin route is restricted exclusively to: arshitchodavadiya@gmail.com
- * Unauthorized users are instantly blocked and redirected to Home without exposing any admin data.
+ * STEALTH GOD MODE SECURITY:
+ * - /admin serves a simple, brutalist login screen.
+ * - If wrong credentials are submitted, or if an unauthenticated user accesses /admin/dashboard,
+ *   a 404 Page Not Found component is rendered so the route appears non-existent to outsiders.
+ * - Zero hardcoded emails or credentials in frontend code.
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, Alert } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AuthScreen from '../screens/AuthScreen';
 import HomeScreen from '../screens/HomeScreen';
@@ -19,12 +21,13 @@ import DebateScreen from '../screens/DebateScreen';
 import HistoryScreen from '../screens/HistoryScreen';
 import LegalComplianceScreen from '../screens/LegalComplianceScreen';
 import AdminDashboardScreen from '../screens/AdminDashboardScreen';
+import AdminLoginScreen from '../screens/AdminLoginScreen';
+import NotFoundScreen from '../components/NotFoundScreen';
 import PricingScreen from '../screens/PricingScreen';
 import PremiumSuccessScreen from '../screens/PremiumSuccessScreen';
 import OracleOfWealthScreen from '../screens/OracleOfWealthScreen';
 import { COLORS } from '../theme/colors';
 import { getLocalSession, clearLocalSession, getInitialAuthSync } from '../services/supabaseClient';
-import { adminService, isSovereignEmail, SOVEREIGN_ADMIN_EMAIL } from '../services/adminService';
 
 export default function AppNavigator({ initialAuth, onAuthChange }) {
   const [currentScreen, setCurrentScreen] = useState('Home');
@@ -33,7 +36,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     typeof initialAuth === 'boolean' ? initialAuth : getInitialAuthSync()
   );
 
-  // Dedicated Clean /admin, /pricing & /success Route & Deep-Link Listener with STRICT RBAC
+  // Dedicated Route & Deep-Link Listener with Stealth 404 Enclave
   useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const checkRoute = async () => {
@@ -41,35 +44,39 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
         const search = (window.location.search || '').toLowerCase();
         const hash = (window.location.hash || '').toLowerCase();
 
-        if (
-          path === '/admin' ||
-          path.startsWith('/admin') ||
-          search.includes('admin') ||
-          hash.includes('admin')
-        ) {
-          // STRICT RBAC CHECK: Verify authenticated email is arshitchodavadiya@gmail.com
-          let activeEmail = await adminService.getActiveUserEmail();
-          if (!activeEmail) {
-            // Allow auth session up to 400ms to hydrate on direct page load
-            await new Promise(r => setTimeout(r, 400));
-            activeEmail = await adminService.getActiveUserEmail();
+        // Check if admin token is present in storage or session
+        const getAdminToken = async () => {
+          try {
+            let token = await AsyncStorage.getItem('@councilx_admin_jwt');
+            if (!token && typeof window !== 'undefined' && window.sessionStorage) {
+              token = window.sessionStorage.getItem('@councilx_admin_jwt');
+            }
+            return token;
+          } catch (e) {
+            return null;
           }
+        };
 
-          if (isSovereignEmail(activeEmail)) {
-            setCurrentScreen('Admin');
+        if (path === '/admin/dashboard' || path.startsWith('/admin/dashboard')) {
+          // If accessing dashboard directly: must have verified token or render 404
+          const token = await getAdminToken();
+          if (token) {
+            setCurrentScreen('AdminDashboard');
           } else {
-            // Instantly block and redirect to home screen without exposing any admin data
-            window.history.replaceState(null, '', '/');
-            setCurrentScreen('Home');
-            setTimeout(() => {
-              window.alert(
-                'ACCESS DENIED (સુરક્ષા અવરોધ):\n\n' +
-                'Strict Role-Based Access Control is enforced.\n' +
-                'This Super Admin route is restricted exclusively to arshitchodavadiya@gmail.com.\n' +
-                'Unauthorized access attempts are blocked and logged.'
-              );
-            }, 100);
+            // Stealth disguise: render 404 Page Not Found component
+            setCurrentScreen('NotFound');
           }
+        } else if (path === '/admin' || path === '/admin/' || search.includes('admin') || hash.includes('admin')) {
+          // Accessing /admin root: if already authenticated, go to dashboard; else show brutalist login
+          const token = await getAdminToken();
+          if (token) {
+            setCurrentScreen('AdminDashboard');
+          } else {
+            setCurrentScreen('AdminLogin');
+          }
+        } else if (path.startsWith('/admin/')) {
+          // Unknown admin subpath: render 404
+          setCurrentScreen('NotFound');
         } else if (
           path === '/pricing' ||
           path.startsWith('/pricing') ||
@@ -105,17 +112,6 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
       checkRoute();
 
       window.addEventListener('popstate', checkRoute);
-
-      // Backdoor console helper for Sovereign Administrator
-      window.__councilx_open_admin = async () => {
-        const activeEmail = await adminService.getActiveUserEmail();
-        if (isSovereignEmail(activeEmail)) {
-          setCurrentScreen('Admin');
-          window.history.pushState(null, '', '/admin');
-        } else {
-          window.alert('ACCESS DENIED: Restricted exclusively to ' + SOVEREIGN_ADMIN_EMAIL);
-        }
-      };
 
       window.__councilx_open_pricing = () => {
         setCurrentScreen('Pricing');
@@ -165,15 +161,42 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
 
   const navigation = {
     navigate: async (screenName, params = {}) => {
-      // STRICT RBAC CHECK FOR ADMIN NAVIGATION
-      if (screenName === 'Admin') {
-        const activeEmail = await adminService.getActiveUserEmail();
-        if (!isSovereignEmail(activeEmail)) {
-          const alertMsg = 'ACCESS DENIED:\nStrict RBAC is active. Admin dashboard is restricted exclusively to ' + SOVEREIGN_ADMIN_EMAIL;
+      // Stealth verification for admin screens
+      if (screenName === 'Admin' || screenName === 'AdminDashboard') {
+        let token = null;
+        try {
+          token = await AsyncStorage.getItem('@councilx_admin_jwt');
+          if (!token && Platform.OS === 'web' && typeof window !== 'undefined') {
+            token = window.sessionStorage.getItem('@councilx_admin_jwt');
+          }
+        } catch (e) {}
+
+        if (screenName === 'AdminDashboard') {
+          if (!token) {
+            setCurrentScreen('NotFound');
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.history.pushState(null, '', '/admin/dashboard');
+            }
+            return;
+          }
+          setCurrentScreen('AdminDashboard');
           if (Platform.OS === 'web' && typeof window !== 'undefined') {
-            window.alert(alertMsg);
+            window.history.pushState(null, '', '/admin/dashboard');
+          }
+          return;
+        }
+
+        if (screenName === 'Admin') {
+          if (token) {
+            setCurrentScreen('AdminDashboard');
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.history.pushState(null, '', '/admin/dashboard');
+            }
           } else {
-            Alert.alert('Access Denied', alertMsg);
+            setCurrentScreen('AdminLogin');
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.history.pushState(null, '', '/admin');
+            }
           }
           return;
         }
@@ -183,9 +206,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
       setCurrentScreen(screenName);
 
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
-        if (screenName === 'Admin') {
-          window.history.pushState(null, '', '/admin');
-        } else if (screenName === 'Pricing') {
+        if (screenName === 'Pricing') {
           window.history.pushState(null, '', '/pricing');
         } else if (screenName === 'Oracle') {
           window.history.pushState(null, '', '/oracle');
@@ -224,11 +245,43 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     }
   };
 
-  // Dedicated Admin Screen: Accessible exclusively if authenticated email is arshitchodavadiya@gmail.com
-  if (currentScreen === 'Admin') {
+  // Dedicated Stealth Admin Dashboard: Accessible when authenticated via JWT
+  if (currentScreen === 'AdminDashboard' || currentScreen === 'Admin') {
     return (
       <View style={styles.container}>
-        <AdminDashboardScreen navigation={navigation} />
+        <AdminDashboardScreen
+          navigation={navigation}
+          onLogout={() => {
+            setCurrentScreen('Home');
+            if (Platform.OS === 'web' && typeof window !== 'undefined') {
+              window.history.replaceState(null, '', '/');
+            }
+          }}
+        />
+      </View>
+    );
+  }
+
+  // Dedicated Stealth Brutalist Admin Login Screen: Accessible at /admin
+  if (currentScreen === 'AdminLogin') {
+    return (
+      <View style={styles.container}>
+        <AdminLoginScreen
+          navigation={navigation}
+          onLoginSuccess={() => setCurrentScreen('AdminDashboard')}
+        />
+      </View>
+    );
+  }
+
+  // Stealth 404 Disguise: Returned on unauthenticated dashboard access or wrong credentials
+  if (currentScreen === 'NotFound') {
+    return (
+      <View style={styles.container}>
+        <NotFoundScreen
+          navigation={navigation}
+          onGoHome={() => setCurrentScreen('Home')}
+        />
       </View>
     );
   }
@@ -288,8 +341,33 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
         return <PricingScreen route={{ params: screenParams }} navigation={navigation} />;
       case 'Oracle':
         return <OracleOfWealthScreen route={{ params: screenParams }} navigation={navigation} />;
+      case 'AdminDashboard':
       case 'Admin':
-        return <AdminDashboardScreen navigation={navigation} />;
+        return (
+          <AdminDashboardScreen
+            navigation={navigation}
+            onLogout={() => {
+              setCurrentScreen('Home');
+              if (Platform.OS === 'web' && typeof window !== 'undefined') {
+                window.history.replaceState(null, '', '/');
+              }
+            }}
+          />
+        );
+      case 'AdminLogin':
+        return (
+          <AdminLoginScreen
+            navigation={navigation}
+            onLoginSuccess={() => setCurrentScreen('AdminDashboard')}
+          />
+        );
+      case 'NotFound':
+        return (
+          <NotFoundScreen
+            navigation={navigation}
+            onGoHome={() => setCurrentScreen('Home')}
+          />
+        );
       case 'Auth':
         return (
           <AuthScreen 
