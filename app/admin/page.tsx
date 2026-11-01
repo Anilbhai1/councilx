@@ -45,7 +45,7 @@ export default function AdminPage() {
         setIsAuthenticated(true);
         fetchUsers(savedToken);
       }
-    } catch (e) {}
+    } catch (e) { }
   }, []);
 
   const fetchUsers = async (jwtToken: string) => {
@@ -106,7 +106,7 @@ export default function AdminPage() {
         try {
           sessionStorage.setItem('@councilx_admin_jwt', data.token);
           localStorage.setItem('@councilx_admin_jwt', data.token);
-        } catch (e) {}
+        } catch (e) { }
         fetchUsers(data.token);
       } else {
         setErrorMessage('AUTHENTICATION FAILED');
@@ -150,7 +150,7 @@ export default function AdminPage() {
     try {
       sessionStorage.removeItem('@councilx_admin_jwt');
       localStorage.removeItem('@councilx_admin_jwt');
-    } catch (e) {}
+    } catch (e) { }
     setIsAuthenticated(false);
     setToken('');
     setUsers([]);

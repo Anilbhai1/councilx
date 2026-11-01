@@ -174,11 +174,11 @@ export default function WatchAdRewardModal({
       visible={visible}
       transparent
       animationType="fade"
-      onRequestClose={adState === 'playing' ? () => {} : onClose}
+      onRequestClose={adState === 'playing' ? () => { } : onClose}
     >
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          
+
           {/* Header Bar */}
           <View style={styles.header}>
             <View style={styles.headerTitleRow}>
@@ -200,7 +200,7 @@ export default function WatchAdRewardModal({
               </View>
 
               <Text style={styles.title}>The Council Requires an Offering</Text>
-              
+
               <Text style={styles.description}>
                 Watch a brief transmission to earn <Text style={styles.goldHighlight}>3 Free Consultations</Text>, or upgrade to Sovereign Syndicate for unlimited real-time access.
               </Text>
@@ -249,7 +249,7 @@ export default function WatchAdRewardModal({
               </Animated.View>
 
               <Text style={styles.playingTitle}>RECEIVING COUNCIL TRANSMISSION</Text>
-              
+
               <Text style={styles.countdownNumber}>0:0{countdown}</Text>
 
               <Text style={styles.playingSubtitle}>
@@ -276,7 +276,7 @@ export default function WatchAdRewardModal({
               </View>
 
               <Text style={styles.successTitle}>TRANSMISSION VERIFIED</Text>
-              
+
               <Text style={styles.successAmount}>+{earnedCredits} Council Credits</Text>
 
               <Text style={styles.successSubtitle}>
@@ -560,3 +560,4 @@ const styles = StyleSheet.create({
     fontWeight: '800'
   }
 });
+

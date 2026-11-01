@@ -310,7 +310,7 @@ export default function OracleOfWealthScreen({ navigation }) {
       .then(telemetry => {
         if (telemetry) setLiveTelemetry(telemetry);
       })
-      .catch(() => {})
+      .catch(() => { })
       .finally(() => setTelemetryLoading(false));
 
     const chairLead = selectedFeature.councilChairs[0];

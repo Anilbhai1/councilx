@@ -32,6 +32,7 @@ import PaywallModal from '../components/PaywallModal';
 import ProfileModal from '../components/ProfileModal';
 import CreateAgentModal from '../components/CreateAgentModal';
 import CustomAgentsSection from '../components/CustomAgentsSection';
+import AppFooter from '../components/AppFooter';
 import { agentService } from '../services/agentService';
 import { paymentService } from '../services/paymentService';
 import { getGuaranteedAvatarUrl } from '../services/wikipediaService';
@@ -430,6 +431,7 @@ export default function HomeScreen({ navigation }) {
               <AgentCard agent={item} onPress={handleSelectAgent} />
             )}
             ListHeaderComponent={renderDirectoryHeader}
+            ListFooterComponent={<AppFooter />}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
