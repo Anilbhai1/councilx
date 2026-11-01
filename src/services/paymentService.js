@@ -28,7 +28,8 @@ const STORAGE_KEYS = {
   PAYMENTS: '@councilx_payments',
   EXTRA_AGENT_SLOTS: '@councilx_extra_agent_slots',
   CUSTOM_AGENTS: '@councilx_custom_agents',
-  LIFETIME_AGENTS_CREATED: '@councilx_lifetime_agents_created'
+  LIFETIME_AGENTS_CREATED: '@councilx_lifetime_agents_created',
+  COUNCIL_CREDITS: '@councilx_council_credits'
 };
 
 
@@ -373,6 +374,85 @@ export const paymentService = {
   },
 
   /**
+   * FREEMIUM REWARD ECONOMY: Get user's Council Credits
+   */
+  async getCredits() {
+    try {
+      const stored = await AsyncStorage.getItem(STORAGE_KEYS.COUNCIL_CREDITS);
+      if (stored !== null) {
+        return Math.max(0, parseInt(stored, 10) || 0);
+      }
+      return 3; // Default starter 3 consultations
+    } catch (e) {
+      return 3;
+    }
+  },
+
+  /**
+   * Increment Council Credits by specified amount (default +3 for watching rewarded ad)
+   */
+  async addCredits(amount = 3) {
+    try {
+      const current = await this.getCredits();
+      const updated = current + amount;
+      await AsyncStorage.setItem(STORAGE_KEYS.COUNCIL_CREDITS, updated.toString());
+      return updated;
+    } catch (e) {
+      return amount;
+    }
+  },
+
+  /**
+   * Deduct 1 credit for Oracle interaction
+   */
+  async deductCredit() {
+    try {
+      const current = await this.getCredits();
+      const updated = Math.max(0, current - 1);
+      await AsyncStorage.setItem(STORAGE_KEYS.COUNCIL_CREDITS, updated.toString());
+      return updated;
+    } catch (e) {
+      return 0;
+    }
+  },
+
+  /**
+   * Claim Rewarded Ad Tokens (+3 Credits) via backend /api/rewards endpoint
+   */
+  async claimAdReward(verificationToken = null) {
+    const userId = await this.getUserId();
+    const token = verificationToken || `ad_view_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    
+    try {
+      const resp = await fetch('/api/rewards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-ad-token': token
+        },
+        body: JSON.stringify({
+          userId,
+          verificationToken: token,
+          adPlacementId: 'rewarded_transmission'
+        })
+      });
+
+      if (resp.ok) {
+        const data = await resp.json();
+        const newCredits = typeof data.credits === 'number' ? data.credits : (await this.getCredits() + 3);
+        await AsyncStorage.setItem(STORAGE_KEYS.COUNCIL_CREDITS, newCredits.toString());
+        return { success: true, credits: newCredits, creditsAwarded: 3 };
+      }
+    } catch (apiErr) {
+      console.warn('[paymentService] claimAdReward network notice, crediting locally:', apiErr);
+    }
+
+    // Local fallback credit
+    const updated = await this.addCredits(3);
+    return { success: true, credits: updated, creditsAwarded: 3 };
+  },
+
+  /**
    * Get or generate user's unique promotional/referral code (e.g. CX-78A9)
    */
   async getMyReferralCode() {
@@ -414,7 +494,8 @@ export const paymentService = {
         redeemedReferral,
         blockedStr,
         myRefCode,
-        adminSettings
+        adminSettings,
+        AsyncStorage.getItem(STORAGE_KEYS.COUNCIL_CREDITS)
       ] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.MESSAGE_COUNT),
         AsyncStorage.getItem(STORAGE_KEYS.BONUS_MESSAGES),
@@ -426,7 +507,8 @@ export const paymentService = {
         AsyncStorage.getItem(STORAGE_KEYS.REDEEMED_REFERRAL),
         AsyncStorage.getItem('@councilx_is_blocked'),
         this.getMyReferralCode(),
-        adminService.getSettings()
+        adminService.getSettings(),
+        AsyncStorage.getItem(STORAGE_KEYS.COUNCIL_CREDITS)
       ]);
 
       const messageCount = countStr ? parseInt(countStr, 10) : 0;
@@ -436,6 +518,7 @@ export const paymentService = {
       let effectiveBlocked = blockedStr === 'true';
       let activePlanType = planType;
       let activeExpiresAt = expiresAtStr ? parseInt(expiresAtStr, 10) : null;
+      let userCredits = councilCreditsStr ? parseInt(councilCreditsStr, 10) : 3;
 
       // Real-time sync with Supabase profiles table
       if (isSupabaseConfigured()) {
@@ -443,7 +526,7 @@ export const paymentService = {
           const userId = await this.getUserId();
           const { data: supaProfile } = await supabase
             .from('profiles')
-            .select('is_premium, plan_type, expires_at, bonus_messages, is_blocked')
+            .select('is_premium, plan_type, expires_at, bonus_messages, is_blocked, credits')
             .eq('id', userId)
             .single();
 
@@ -462,6 +545,9 @@ export const paymentService = {
             }
             if (typeof supaProfile.is_blocked === 'boolean') {
               effectiveBlocked = supaProfile.is_blocked;
+            }
+            if (typeof supaProfile.credits === 'number') {
+              userCredits = supaProfile.credits;
             }
           }
         } catch (err) {}
@@ -513,7 +599,8 @@ export const paymentService = {
         activatedAt,
         expiresAt: activeExpiresAt,
         myReferralCode: myRefCode,
-        hasRedeemedCode: Boolean(redeemedCode || redeemedReferral === 'true')
+        hasRedeemedCode: Boolean(redeemedCode || redeemedReferral === 'true'),
+        credits: isPremium ? 999999 : Math.max(0, userCredits)
       };
     } catch (e) {
       return {
@@ -522,6 +609,7 @@ export const paymentService = {
         baseFreeLimit: BASE_FREE_LIMIT,
         totalAllowedFree: BASE_FREE_LIMIT,
         remainingFree: BASE_FREE_LIMIT,
+        credits: 3,
         isPremium: false,
         isExpired: false,
         isLocked: false,

@@ -18,6 +18,16 @@ export default function RootLayout({
           src="https://checkout.razorpay.com/v1/checkout.js"
           strategy="beforeInteractive"
         />
+        {/* GOOGLE ADSENSE REWARDED ADS SDK (PLACEHOLDER) */}
+        {/* Uncomment and replace ca-pub-XXXXXXXXXXXXXXXX with your live AdSense publisher client ID */}
+        {/*
+        <Script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX"
+          crossOrigin="anonymous"
+          strategy="lazyOnload"
+        />
+        */}
       </head>
       <body style={{ margin: 0, padding: 0, backgroundColor: '#050505', color: '#E0E0E0' }}>
         {children}

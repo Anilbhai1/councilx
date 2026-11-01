@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     full_name TEXT,
     avatar_url TEXT,
     is_premium BOOLEAN DEFAULT FALSE,
+    credits INTEGER DEFAULT 0, -- Council Credits for Oracle Consultations (Ad-to-Token Reward Economy)
     message_count INTEGER DEFAULT 0,
     bonus_messages INTEGER DEFAULT 0, -- Bonus from promotional/referral code (+15 for user, +30 for referrer)
     base_free_limit INTEGER DEFAULT 5, -- Default 5 free messages
@@ -28,8 +29,9 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Ensure is_blocked column exists if table was already created
+-- Ensure is_blocked and credits columns exist if table was already created
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_blocked BOOLEAN DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS credits INTEGER DEFAULT 0;
 
 -- 2. 216 MASTERMIND AGENTS TABLE
 CREATE TABLE IF NOT EXISTS public.agents (

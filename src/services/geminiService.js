@@ -10,6 +10,7 @@
  */
 
 import { i18n, getFullLanguageName } from '../utils/i18n.js';
+import { paymentService } from './paymentService.js';
 
 function getApiBaseUrl() {
   if (typeof window !== 'undefined' && window.location) {
@@ -102,7 +103,8 @@ export const geminiService = {
     language = 'gu',
     modelType = 'flash',
     thinkingDepth = 'medium',
-    isPremium = false,
+    isPremium = null,
+    userId = null,
     mode = 'single',
     feature = null,
     reportContext = null
@@ -110,6 +112,20 @@ export const geminiService = {
     const activeChatId = chat_id || chatId;
     const isOracle = mode === 'oracle_of_wealth' || Boolean(feature);
     const base = getApiBaseUrl();
+
+    // Resolve user identity & status for credit economy
+    let resolvedUserId = userId;
+    let resolvedIsPremium = isPremium;
+
+    try {
+      if (!resolvedUserId) {
+        resolvedUserId = await paymentService.getUserId().catch(() => null);
+      }
+      if (resolvedIsPremium === null || resolvedIsPremium === undefined) {
+        const status = await paymentService.getUserStatus().catch(() => null);
+        resolvedIsPremium = Boolean(status?.isPremium);
+      }
+    } catch (e) {}
 
     // Dedicated /api/oracle endpoint when in Oracle of Wealth mode
     const candidateEndpoints = isOracle
@@ -149,9 +165,12 @@ export const geminiService = {
         const resp = await fetch(endpoint, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            ...(resolvedUserId ? { 'x-user-id': resolvedUserId } : {})
           },
           body: JSON.stringify({
+            userId: resolvedUserId,
+            isPremium: resolvedIsPremium,
             messages: formattedMessages,
             userMessage,
             data: {
@@ -159,7 +178,9 @@ export const geminiService = {
               feature,
               mode: mode || (feature ? 'oracle_of_wealth' : 'single'),
               language,
-              reportContext
+              reportContext,
+              userId: resolvedUserId,
+              isPremium: resolvedIsPremium
             },
             agent,
             chatHistory,
@@ -167,7 +188,6 @@ export const geminiService = {
             language,
             modelType,
             thinkingDepth,
-            isPremium,
             mode: mode || (feature ? 'oracle_of_wealth' : 'single'),
             feature,
             reportContext
@@ -220,7 +240,13 @@ export const geminiService = {
           }
         } else {
           const errData = await resp.json().catch(() => null);
-          lastError = new Error(errData?.error || `Server returned error status (${resp.status})`);
+          const errMsg = errData?.message || errData?.error || `Server returned error status (${resp.status})`;
+          const err = new Error(errMsg);
+          if (resp.status === 403 || errData?.code === 'INSUFFICIENT_CREDITS' || errData?.error === 'INSUFFICIENT_CREDITS') {
+            err.code = 'INSUFFICIENT_CREDITS';
+          }
+          err.status = resp.status;
+          lastError = err;
         }
       } catch (callErr) {
         if (callErr.name === 'AbortError') {
@@ -300,7 +326,9 @@ export const geminiService = {
     agent = {},
     chatHistory = [],
     language = 'gu',
-    reportContext = ''
+    reportContext = '',
+    isPremium = null,
+    userId = null
   }) {
     return this.generateAgentResponse({
       agent,
@@ -312,7 +340,8 @@ export const geminiService = {
       reportContext,
       modelType: 'pro',
       thinkingDepth: 'deep',
-      isPremium: true
+      isPremium,
+      userId
     });
   }
 };

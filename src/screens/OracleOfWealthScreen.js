@@ -41,6 +41,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { geminiService } from '../services/geminiService';
 import { paymentService, ORACLE_SUBSCRIPTION_PLANS } from '../services/paymentService';
+import WatchAdRewardModal from '../components/WatchAdRewardModal';
 import { useLanguage } from '../utils/i18n';
 
 // 8 Master Wealth Features Definition
@@ -221,6 +222,7 @@ export default function OracleOfWealthScreen({ navigation }) {
     remainingFree: 5
   });
   const [subscriptionModalVisible, setSubscriptionModalVisible] = useState(false);
+  const [showWatchAdModal, setShowWatchAdModal] = useState(false);
   const [selectedPlanTier, setSelectedPlanTier] = useState('MARKET_MASTER');
   const [subscribing, setSubscribing] = useState(false);
 
@@ -329,7 +331,8 @@ export default function OracleOfWealthScreen({ navigation }) {
         agent: councilAgent,
         chatHistory: [],
         language: lang,
-        reportContext: ''
+        reportContext: '',
+        isPremium: userStatus?.isPremium
       });
 
       if (result && (result.reply || result.content)) {
@@ -361,6 +364,9 @@ export default function OracleOfWealthScreen({ navigation }) {
           }
         ]);
 
+        // Refresh balance
+        loadUserAndShadowStatus();
+
         setTimeout(() => {
           scrollViewRef.current?.scrollToEnd({ animated: true });
         }, 300);
@@ -369,7 +375,12 @@ export default function OracleOfWealthScreen({ navigation }) {
       }
     } catch (err) {
       console.error('[Oracle Intelligence Scan Error]:', err);
-      setReportError(err.message || 'Failed to complete market intelligence audit.');
+      if (err.code === 'INSUFFICIENT_CREDITS' || err.status === 403 || err.message?.includes('INSUFFICIENT_CREDITS') || err.message?.includes('offering')) {
+        setShowWatchAdModal(true);
+        setReportError('The Council requires an offering. Watch a brief transmission to earn 3 Free Consultations, or upgrade to Sovereign Syndicate.');
+      } else {
+        setReportError(err.message || 'Failed to complete market intelligence audit.');
+      }
     } finally {
       setReportLoading(false);
     }
@@ -417,7 +428,7 @@ export default function OracleOfWealthScreen({ navigation }) {
         reportContext: `INITIAL REPORT ON "${reportResult.query}":\n${reportResult.content.slice(0, 1500)}`,
         modelType: 'pro',
         thinkingDepth: 'deep',
-        isPremium: true
+        isPremium: userStatus?.isPremium
       });
 
       const replyText = response.reply || response.content || 'Analysis formulated.';
@@ -432,15 +443,23 @@ export default function OracleOfWealthScreen({ navigation }) {
       };
 
       setChatMessages([...newChatHistory, assistantMsg]);
+      loadUserAndShadowStatus();
+
       setTimeout(() => {
         scrollViewRef.current?.scrollToEnd({ animated: true });
       }, 150);
     } catch (err) {
       console.error('[Oracle Follow-up Chat Error]:', err);
+      const isCreditErr = err.code === 'INSUFFICIENT_CREDITS' || err.status === 403 || err.message?.includes('INSUFFICIENT_CREDITS') || err.message?.includes('offering');
+      if (isCreditErr) {
+        setShowWatchAdModal(true);
+      }
       const errMsg = {
         id: `err_${Date.now()}`,
         role: 'assistant',
-        content: `⚠️ Council Connection Notice: ${err.message || 'Cross-examination timed out. Please ask again.'}`,
+        content: isCreditErr
+          ? '⚡ The Council requires an offering to proceed. Watch a brief transmission to earn 3 Free Consultations, or upgrade to Sovereign Syndicate.'
+          : `⚠️ Council Connection Notice: ${err.message || 'Cross-examination timed out. Please ask again.'}`,
         isError: true,
         createdAt: new Date().toISOString()
       };
@@ -588,16 +607,34 @@ export default function OracleOfWealthScreen({ navigation }) {
           </View>
         </View>
 
-        <TouchableOpacity
-          style={styles.subscribeBtn}
-          onPress={() => setSubscriptionModalVisible(true)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="card-outline" size={14} color="#0A0A0A" />
-          <Text style={styles.subscribeBtnText}>
-            {userStatus.isPremium ? 'SUBSCRIBED' : 'UPGRADE'}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={styles.creditsBadgeBtn}
+            onPress={() => setShowWatchAdModal(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="flash" size={13} color="#D4AF37" />
+            <Text style={styles.creditsBadgeText}>
+              {userStatus.isPremium ? '∞' : (userStatus.credits !== undefined ? userStatus.credits : 3)}
+            </Text>
+            {!userStatus.isPremium && (
+              <View style={styles.creditsPlusTag}>
+                <Text style={styles.creditsPlusTagText}>+3</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.subscribeBtn}
+            onPress={() => setSubscriptionModalVisible(true)}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="card-outline" size={14} color="#0A0A0A" />
+            <Text style={styles.subscribeBtnText}>
+              {userStatus.isPremium ? 'SUBSCRIBED' : 'UPGRADE'}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -1148,6 +1185,21 @@ export default function OracleOfWealthScreen({ navigation }) {
           </View>
         </View>
       </Modal>
+
+      {/* 10. FREEMIUM REWARD ECONOMY - WATCH AD MODAL */}
+      <WatchAdRewardModal
+        visible={showWatchAdModal}
+        currentCredits={userStatus.credits !== undefined ? userStatus.credits : 3}
+        onClose={() => setShowWatchAdModal(false)}
+        onUpgrade={() => {
+          setShowWatchAdModal(false);
+          setSubscriptionModalVisible(true);
+        }}
+        onRewardClaimed={async () => {
+          setShowWatchAdModal(false);
+          await loadUserAndShadowStatus();
+        }}
+      />
     </View>
   );
 }
@@ -1213,6 +1265,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     marginTop: 2
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  creditsBadgeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: 'rgba(212, 175, 55, 0.4)',
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6
+  },
+  creditsBadgeText: {
+    color: '#D4AF37',
+    fontSize: 11,
+    fontWeight: '800',
+    marginLeft: 3
+  },
+  creditsPlusTag: {
+    backgroundColor: 'rgba(212, 175, 55, 0.2)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 4
+  },
+  creditsPlusTagText: {
+    color: '#D4AF37',
+    fontSize: 9,
+    fontWeight: '800'
   },
   subscribeBtn: {
     flexDirection: 'row',
