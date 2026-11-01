@@ -180,6 +180,11 @@ export default function OracleOfWealthScreen({ navigation }) {
   const [reportResult, setReportResult] = useState(null);
   const [reportError, setReportError] = useState(null);
 
+  // Real-Time Market Telemetry State (yahoo-finance2 Live Integration)
+  const [macroOverview, setMacroOverview] = useState([]);
+  const [liveTelemetry, setLiveTelemetry] = useState(null);
+  const [telemetryLoading, setTelemetryLoading] = useState(false);
+
   // Appended Interactive Follow-up Chat State
   const [chatMessages, setChatMessages] = useState([]);
   const [followUpInput, setFollowUpInput] = useState('');
@@ -207,7 +212,21 @@ export default function OracleOfWealthScreen({ navigation }) {
 
   useEffect(() => {
     loadUserAndShadowStatus();
+    loadMacroOverview();
+    const interval = setInterval(loadMacroOverview, 35000);
+    return () => clearInterval(interval);
   }, []);
+
+  const loadMacroOverview = async () => {
+    try {
+      const data = await geminiService.fetchLiveMarketOverview();
+      if (Array.isArray(data) && data.length > 0) {
+        setMacroOverview(data);
+      }
+    } catch (e) {
+      console.warn('Macro overview notice:', e);
+    }
+  };
 
   const loadUserAndShadowStatus = async () => {
     try {
@@ -225,6 +244,7 @@ export default function OracleOfWealthScreen({ navigation }) {
     setCustomQuery('');
     setReportResult(null);
     setReportError(null);
+    setLiveTelemetry(null);
     setChatMessages([]);
   };
 
@@ -252,7 +272,17 @@ export default function OracleOfWealthScreen({ navigation }) {
     setReportLoading(true);
     setReportError(null);
     setReportResult(null);
+    setLiveTelemetry(null);
     setChatMessages([]);
+
+    // Asynchronously trigger live telemetry fetch immediately
+    setTelemetryLoading(true);
+    geminiService.fetchLiveMarketData(query)
+      .then(telemetry => {
+        if (telemetry) setLiveTelemetry(telemetry);
+      })
+      .catch(() => {})
+      .finally(() => setTelemetryLoading(false));
 
     const chairLead = selectedFeature.councilChairs[0];
     const chairColleague = selectedFeature.councilChairs[1] || 'Council X';
@@ -279,6 +309,10 @@ export default function OracleOfWealthScreen({ navigation }) {
         const fullContent = (result.reply || result.content).trim();
         const followUps = result.follow_ups || result.followUpQuestions || [];
 
+        if (result.liveMarketData) {
+          setLiveTelemetry(result.liveMarketData);
+        }
+
         setReportResult({
           content: fullContent,
           followUps,
@@ -286,7 +320,8 @@ export default function OracleOfWealthScreen({ navigation }) {
           featureId: selectedFeature.id,
           featureTitle: selectedFeature.title,
           councilChairs: selectedFeature.councilChairs,
-          timestamp: new Date().toLocaleTimeString()
+          timestamp: new Date().toLocaleTimeString(),
+          liveMarketData: result.liveMarketData || null
         });
 
         // Initialize Appended Chat with initial welcome message from the Council
@@ -463,16 +498,10 @@ export default function OracleOfWealthScreen({ navigation }) {
         const rzp = new window.Razorpay(options);
         rzp.open();
       } else {
-        // Fallback for native or development
-        await paymentService.verifyRazorpaySubscription({
-          razorpay_payment_id: `pay_dev_${Date.now()}`,
-          razorpay_subscription_id: subRes.subscription_id,
-          razorpay_signature: 'dev_mock_sig',
-          planTier
-        });
-        setSubscriptionModalVisible(false);
-        await loadUserAndShadowStatus();
-        Alert.alert('Subscription Activated', `${targetPlan.name} is now active.`);
+        Alert.alert(
+          'Payment Gateway Initializing',
+          'Razorpay payment gateway checkout is initializing. Please ensure popups are allowed and click Subscribe again.'
+        );
         setSubscribing(false);
       }
     } catch (err) {
@@ -540,6 +569,41 @@ export default function OracleOfWealthScreen({ navigation }) {
         contentContainerStyle={styles.scrollInner}
         showsVerticalScrollIndicator={false}
       >
+        {/* 1.5. REAL-TIME GLOBAL MACRO ANCHORS (YAHOO FINANCE LIVE FEED) */}
+        {macroOverview && macroOverview.length > 0 && (
+          <View style={styles.macroTickerSection}>
+            <View style={styles.macroTickerHeaderRow}>
+              <View style={styles.livePulseDot} />
+              <Text style={styles.macroTickerHeaderLabel}>REAL-TIME MARKET ANCHORS</Text>
+              <View style={styles.liveBadgePill}>
+                <Text style={styles.liveBadgePillText}>LIVE FEED</Text>
+              </View>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.macroTickerScroll}
+            >
+              {macroOverview.map((item, idx) => {
+                const isPositive = (item.change || 0) >= 0;
+                return (
+                  <View key={idx} style={styles.macroChip}>
+                    <Text style={styles.macroName}>{item.name}</Text>
+                    <Text style={styles.macroPrice}>
+                      {item.price ? Number(item.price).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '—'}
+                    </Text>
+                    <View style={[styles.macroChangePill, isPositive ? styles.macroChangePositive : styles.macroChangeNegative]}>
+                      <Text style={[styles.macroChangeText, isPositive ? styles.macroTextPositive : styles.macroTextNegative]}>
+                        {isPositive ? '+' : ''}{item.changePercent ? item.changePercent.toFixed(2) : '0.00'}%
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* 2. 8 MASTER FEATURES SELECTOR CAROUSEL */}
         <View style={styles.featureSelectorSection}>
           <Text style={styles.sectionHeaderLabel}>8 MASTER WEALTH ENGINES</Text>
@@ -677,6 +741,90 @@ export default function OracleOfWealthScreen({ navigation }) {
           <View style={styles.errorBox}>
             <Ionicons name="alert-circle" size={20} color="#E57373" />
             <Text style={styles.errorText}>{reportError}</Text>
+          </View>
+        )}
+
+        {/* 5.5. LIVE INSTITUTIONAL REALITY CARD (YAHOO FINANCE VERIFIED) */}
+        {liveTelemetry && (
+          <View style={styles.telemetryCard}>
+            <View style={styles.telemetryTopBar}>
+              <View style={styles.telemetryTagBox}>
+                <Ionicons name="pulse" size={13} color="#4ADE80" />
+                <Text style={styles.telemetryTagText}>
+                  LIVE INSTITUTIONAL REALITY // {liveTelemetry.symbol}
+                </Text>
+              </View>
+              <Text style={styles.telemetryExchangeTag}>{liveTelemetry.exchangeName || 'NSE'}</Text>
+            </View>
+
+            <View style={styles.telemetryMainRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.telemetrySymbolText}>{liveTelemetry.symbol}</Text>
+                <Text style={styles.telemetryCompanyText} numberOfLines={1}>
+                  {liveTelemetry.shortName || liveTelemetry.longName || liveTelemetry.symbol}
+                </Text>
+              </View>
+
+              <View style={styles.telemetryPriceBox}>
+                <Text style={styles.telemetryPriceVal}>
+                  {liveTelemetry.currency || 'INR'} {Number(liveTelemetry.regularMarketPrice || 0).toLocaleString('en-IN', { maximumFractionDigits: 2 })}
+                </Text>
+                <Text style={[
+                  styles.telemetryChangeText,
+                  (liveTelemetry.regularMarketChange || 0) >= 0 ? styles.macroTextPositive : styles.macroTextNegative
+                ]}>
+                  {(liveTelemetry.regularMarketChange || 0) >= 0 ? '+' : ''}
+                  {liveTelemetry.regularMarketChange || 0} ({(liveTelemetry.regularMarketChangePercent || 0) >= 0 ? '+' : ''}{liveTelemetry.regularMarketChangePercent || 0}%)
+                </Text>
+              </View>
+            </View>
+
+            {/* Micro Metrics Grid */}
+            <View style={styles.telemetryGrid}>
+              {liveTelemetry.regularMarketDayLow && liveTelemetry.regularMarketDayHigh && (
+                <View style={styles.telemetryGridItem}>
+                  <Text style={styles.gridLabel}>DAY RANGE</Text>
+                  <Text style={styles.gridValue}>{liveTelemetry.regularMarketDayLow} - {liveTelemetry.regularMarketDayHigh}</Text>
+                </View>
+              )}
+              {liveTelemetry.fiftyTwoWeekLow && liveTelemetry.fiftyTwoWeekHigh && (
+                <View style={styles.telemetryGridItem}>
+                  <Text style={styles.gridLabel}>52-WEEK RANGE</Text>
+                  <Text style={styles.gridValue}>{liveTelemetry.fiftyTwoWeekLow} - {liveTelemetry.fiftyTwoWeekHigh}</Text>
+                </View>
+              )}
+              {liveTelemetry.marketCap && (
+                <View style={styles.telemetryGridItem}>
+                  <Text style={styles.gridLabel}>MARKET CAP</Text>
+                  <Text style={styles.gridValue}>₹{(liveTelemetry.marketCap / 1e7).toLocaleString('en-IN', { maximumFractionDigits: 0 })} Cr</Text>
+                </View>
+              )}
+              {liveTelemetry.trailingPE && (
+                <View style={styles.telemetryGridItem}>
+                  <Text style={styles.gridLabel}>P/E MULTIPLE</Text>
+                  <Text style={styles.gridValue}>{liveTelemetry.trailingPE}x</Text>
+                </View>
+              )}
+              {liveTelemetry.financials?.debtToEquity !== null && liveTelemetry.financials?.debtToEquity !== undefined && (
+                <View style={styles.telemetryGridItem}>
+                  <Text style={styles.gridLabel}>DEBT / EQUITY</Text>
+                  <Text style={styles.gridValue}>{liveTelemetry.financials.debtToEquity}%</Text>
+                </View>
+              )}
+              {liveTelemetry.financials?.profitMargins && (
+                <View style={styles.telemetryGridItem}>
+                  <Text style={styles.gridLabel}>NET MARGIN</Text>
+                  <Text style={styles.gridValue}>{liveTelemetry.financials.profitMargins}%</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.telemetryFooter}>
+              <Ionicons name="shield-checkmark" size={11} color="#D4AF37" />
+              <Text style={styles.telemetryFooterText}>
+                VERIFIED REAL LIVE TELEMETRY • BASE FOR THE 216 MASTERMINDS' VERDICT
+              </Text>
+            </View>
           </View>
         )}
 
@@ -1720,5 +1868,199 @@ const styles = StyleSheet.create({
     fontSize: 9,
     textAlign: 'center',
     marginTop: 8
+  },
+
+  // 10. REAL-TIME MACRO ANCHORS & LIVE TELEMETRY STYLES
+  macroTickerSection: {
+    backgroundColor: '#0A0A0A',
+    borderBottomWidth: 1,
+    borderBottomColor: '#181818',
+    paddingVertical: 10,
+    paddingHorizontal: 16
+  },
+  macroTickerHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  livePulseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4ADE80',
+    marginRight: 6
+  },
+  macroTickerHeaderLabel: {
+    color: '#8E8E93',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 1.1
+  },
+  liveBadgePill: {
+    backgroundColor: '#0F291E',
+    borderWidth: 1,
+    borderColor: '#1C6B46',
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 4,
+    marginLeft: 8
+  },
+  liveBadgePillText: {
+    color: '#4ADE80',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.6
+  },
+  macroTickerScroll: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  macroChip: {
+    backgroundColor: '#121212',
+    borderWidth: 1,
+    borderColor: '#222222',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginRight: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8
+  },
+  macroName: {
+    color: '#8E8E93',
+    fontSize: 10,
+    fontWeight: '700'
+  },
+  macroPrice: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800'
+  },
+  macroChangePill: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3
+  },
+  macroChangePositive: {
+    backgroundColor: '#0E2419'
+  },
+  macroChangeNegative: {
+    backgroundColor: '#2A1215'
+  },
+  macroChangeText: {
+    fontSize: 9,
+    fontWeight: '700'
+  },
+  macroTextPositive: {
+    color: '#4ADE80'
+  },
+  macroTextNegative: {
+    color: '#F87171'
+  },
+
+  // Telemetry Reality Card
+  telemetryCard: {
+    backgroundColor: '#111111',
+    borderWidth: 1,
+    borderColor: '#2D2513',
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 16
+  },
+  telemetryTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  telemetryTagBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5
+  },
+  telemetryTagText: {
+    color: '#D4AF37',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.8
+  },
+  telemetryExchangeTag: {
+    color: '#666666',
+    fontSize: 9,
+    fontWeight: '700'
+  },
+  telemetryMainRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10
+  },
+  telemetrySymbolText: {
+    color: '#FFFFFF',
+    fontSize: 17,
+    fontWeight: '900',
+    letterSpacing: 0.5
+  },
+  telemetryCompanyText: {
+    color: '#8E8E93',
+    fontSize: 11,
+    marginTop: 2
+  },
+  telemetryPriceBox: {
+    alignItems: 'flex-end'
+  },
+  telemetryPriceVal: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '900'
+  },
+  telemetryChangeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2
+  },
+  telemetryGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    borderTopWidth: 1,
+    borderTopColor: '#1E1E1E',
+    paddingTop: 10,
+    gap: 8
+  },
+  telemetryGridItem: {
+    width: '48%',
+    backgroundColor: '#161616',
+    borderWidth: 1,
+    borderColor: '#242424',
+    borderRadius: 6,
+    padding: 8
+  },
+  gridLabel: {
+    color: '#666666',
+    fontSize: 8,
+    fontWeight: '800',
+    letterSpacing: 0.6
+  },
+  gridValue: {
+    color: '#E0E0E0',
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2
+  },
+  telemetryFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 10,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#1A1A1A'
+  },
+  telemetryFooterText: {
+    color: '#777777',
+    fontSize: 8,
+    fontWeight: '700',
+    letterSpacing: 0.5
   }
 });

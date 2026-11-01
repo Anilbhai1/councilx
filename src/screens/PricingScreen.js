@@ -671,18 +671,18 @@ export default function PricingScreen({ navigation, route }) {
               </View>
 
               {/* Verified payment badges for UPI, RuPay, Visa */}
-              <View style={styles.dummyIconsRow}>
-                <View style={styles.dummyIconChip}>
-                  <Text style={styles.dummyChipTextUPI}>UPI</Text>
+              <View style={styles.paymentBadgesRow}>
+                <View style={styles.paymentBadgeChip}>
+                  <Text style={styles.badgeTextUPI}>UPI</Text>
                 </View>
-                <View style={styles.dummyIconChip}>
-                  <Text style={styles.dummyChipTextRuPay}>RuPay</Text>
+                <View style={styles.paymentBadgeChip}>
+                  <Text style={styles.badgeTextRuPay}>RuPay</Text>
                 </View>
-                <View style={styles.dummyIconChip}>
-                  <Text style={styles.dummyChipTextVisa}>VISA</Text>
+                <View style={styles.paymentBadgeChip}>
+                  <Text style={styles.badgeTextVisa}>VISA</Text>
                 </View>
-                <View style={styles.dummyIconChip}>
-                  <Text style={styles.dummyChipTextMC}>MC</Text>
+                <View style={styles.paymentBadgeChip}>
+                  <Text style={styles.badgeTextMC}>MC</Text>
                 </View>
               </View>
 
@@ -719,19 +719,19 @@ export default function PricingScreen({ navigation, route }) {
                 </View>
               </View>
 
-              {/* Dummy icons for PayPal, Visa, Mastercard, Amex */}
-              <View style={styles.dummyIconsRow}>
-                <View style={[styles.dummyIconChip, styles.payPalChip]}>
+              {/* Verified payment badges for PayPal, Visa, Mastercard, Amex */}
+              <View style={styles.paymentBadgesRow}>
+                <View style={[styles.paymentBadgeChip, styles.payPalChip]}>
                   <Text style={styles.payPalChipText}>PayPal</Text>
                 </View>
-                <View style={styles.dummyIconChip}>
-                  <Text style={styles.dummyChipTextVisa}>VISA</Text>
+                <View style={styles.paymentBadgeChip}>
+                  <Text style={styles.badgeTextVisa}>VISA</Text>
                 </View>
-                <View style={styles.dummyIconChip}>
-                  <Text style={styles.dummyChipTextMC}>MC</Text>
+                <View style={styles.paymentBadgeChip}>
+                  <Text style={styles.badgeTextMC}>MC</Text>
                 </View>
-                <View style={styles.dummyIconChip}>
-                  <Text style={styles.dummyChipTextAmex}>AMEX</Text>
+                <View style={styles.paymentBadgeChip}>
+                  <Text style={styles.badgeTextAmex}>AMEX</Text>
                 </View>
               </View>
 
@@ -1624,12 +1624,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     marginTop: 3,
   },
-  dummyIconsRow: {
+  paymentBadgesRow: {
     flexDirection: 'row',
     gap: 6,
     marginBottom: 14,
   },
-  dummyIconChip: {
+  paymentBadgeChip: {
     backgroundColor: '#181824',
     borderWidth: 1,
     borderColor: '#2C2C3E',
@@ -1637,27 +1637,27 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 5,
   },
-  dummyChipTextUPI: {
+  badgeTextUPI: {
     color: '#10B981',
     fontSize: 9,
     fontWeight: '900',
   },
-  dummyChipTextRuPay: {
+  badgeTextRuPay: {
     color: '#F97316',
     fontSize: 9,
     fontWeight: '900',
   },
-  dummyChipTextVisa: {
+  badgeTextVisa: {
     color: '#38BDF8',
     fontSize: 9,
     fontWeight: '900',
   },
-  dummyChipTextMC: {
+  badgeTextMC: {
     color: '#EF4444',
     fontSize: 9,
     fontWeight: '900',
   },
-  dummyChipTextAmex: {
+  badgeTextAmex: {
     color: '#3B82F6',
     fontSize: 9,
     fontWeight: '900',

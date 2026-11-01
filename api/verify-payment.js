@@ -61,15 +61,10 @@ module.exports = async function handler(req, res) {
     const secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!secret || secret === 'your_razorpay_key_secret_here') {
-      console.warn('[CouncilX Security Notice] RAZORPAY_KEY_SECRET environment variable is not configured or using placeholder.');
-      // When secret is not configured, we inform the caller while allowing development testing
-      return res.status(200).json({
-        success: true,
-        verified: true,
-        mode: 'development_fallback',
-        paymentId: razorpay_payment_id,
-        orderId: razorpay_order_id || null,
-        message: 'Payment received. Set RAZORPAY_KEY_SECRET on server for live cryptographic HMAC-SHA256 signature enforcement.'
+      console.error('[CouncilX Security Error] RAZORPAY_KEY_SECRET is not configured in backend environment.');
+      return res.status(400).json({
+        success: false,
+        error: 'RAZORPAY_KEY_SECRET is not configured in backend environment (.env). Cryptographic verification cannot proceed.'
       });
     }
 

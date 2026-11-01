@@ -46,15 +46,10 @@ module.exports = async function handler(req, res) {
     const secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!secret || secret === 'your_razorpay_key_secret_here') {
-      console.warn('[CouncilX Razorpay Notice]: RAZORPAY_KEY_SECRET not set in .env. Returning development fallback subscription.');
-      return res.status(200).json({
-        success: true,
-        mode: 'development_fallback',
-        subscription_id: `sub_dev_${Date.now()}`,
-        plan_id: planTier === 'SOVEREIGN_SYNDICATE' ? 'plan_sovereign_dev' : 'plan_market_master_dev',
-        key_id: keyId,
-        amount: planTier === 'SOVEREIGN_SYNDICATE' ? 249900 : 99900,
-        currency: 'INR'
+      console.error('[CouncilX Backend Error] RAZORPAY_KEY_SECRET is not configured in backend environment (.env).');
+      return res.status(400).json({
+        success: false,
+        error: 'RAZORPAY_KEY_SECRET is missing or not set in backend environment (.env). Please configure your live Razorpay Key Secret.'
       });
     }
 

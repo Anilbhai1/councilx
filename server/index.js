@@ -37,6 +37,7 @@ const verifyPaymentHandler = require('../api/verify-payment');
 const createSubscriptionHandler = require('../api/create-subscription');
 const verifySubscriptionHandler = require('../api/verify-subscription');
 const chatHandler = require('../api/chat');
+const oracleHandler = require('../api/oracle');
 
 const PORT = process.env.PORT || 3001;
 
@@ -79,6 +80,12 @@ const server = http.createServer((req, res) => {
     if (url === '/api/chat' || url === '/api/gemini' || url === '/api/chat/route') {
       try {
         await chatHandler(req, res);
+      } catch (err) {
+        res.status(500).json({ success: false, error: err.message });
+      }
+    } else if (url === '/api/oracle' || url === '/api/oracle/route') {
+      try {
+        await oracleHandler(req, res);
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }

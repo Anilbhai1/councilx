@@ -15,6 +15,11 @@ export const maxDuration = 60;
  * - Tavily: process.env.TAVILY_API_KEY
  */
 
+let getLiveFinancialContext = null;
+try {
+  getLiveFinancialContext = require('../finance').getLiveFinancialContext;
+} catch (e) {}
+
 /**
  * Helper to explicitly extract and trim API keys from Edge process.env, request headers, and client payload
  */
@@ -337,6 +342,10 @@ CRITICAL DEEP-RESEARCH & MASTERCLASS STRUCTURE:
 
   if (reportContext) {
     prompt += `\n\n=== INITIAL REPORT CONTEXT BEING CROSS-EXAMINED ===\n${reportContext}\n====================================================`;
+  }
+
+  if (options.liveFinancialContext) {
+    prompt += `\n\n${options.liveFinancialContext}\n============================================================\nCRITICAL MASTERMIND ENFORCEMENT:\nThe 216 Masterminds MUST base their 'The Verdict', 'The Why (Deep Logic)', 'The Why Not (Trap Avoidance)', and 'The Final Strategic Move' strictly upon this verified live market data.\n`;
   }
 
   if (liveSearchContext) {
@@ -809,17 +818,41 @@ export async function POST(request) {
     const feature = body.feature || '';
     const reportContext = body.reportContext || '';
 
-    // 1. Agentic Real-Time RAG (with Oracle of Wealth live financial queries)
+    const isOracleOfWealth = mode === 'oracle_of_wealth' || 
+      Boolean(feature) || 
+      agent?.category === 'Wealth' || 
+      agent?.category === 'Stock Market' || 
+      agent?.category === 'Finance' || 
+      (agent?.name || '').toLowerCase().includes('oracle') ||
+      (agent?.name || '').toLowerCase().includes('wealth');
+
+    // 1. Live Market Data Integration via yahoo-finance2
+    let liveFinancialContext = null;
+    let liveMarketData = null;
+    if (isOracleOfWealth && typeof getLiveFinancialContext === 'function') {
+      try {
+        const finRes = await getLiveFinancialContext(userMessage, feature);
+        if (finRes) {
+          liveFinancialContext = finRes.promptContext;
+          liveMarketData = finRes.liveMarketData;
+        }
+      } catch (fErr) {
+        console.warn('[Finance Integration Error]:', fErr.message);
+      }
+    }
+
+    // 2. Agentic Real-Time RAG (with Oracle of Wealth live financial queries)
     const liveSearchContext = await performAgenticWebSearch(userMessage, agent, keys.tavilyApiKey, feature);
 
-    // 2. Build Master System Prompt with The Sovereign Blueprint & A-to-Z Masterclass
+    // 3. Build Master System Prompt with The Sovereign Blueprint & A-to-Z Masterclass & Live Yahoo Data
     const systemInstruction = buildMasterSystemPrompt(agent, language, liveSearchContext, {
       mode,
       feature,
-      reportContext
+      reportContext,
+      liveFinancialContext
     });
 
-    // 3. Dispatch to Max-Power LLM with explicitly mapped keys
+    // 4. Dispatch to Max-Power LLM with explicitly mapped keys
     const result = await executeMaxPowerLLM({
       systemInstruction,
       messagesHistory: Array.isArray(chatHistory) ? chatHistory : [],
@@ -858,7 +891,8 @@ export async function POST(request) {
       content: result.reply,
       followUpQuestions: result.follow_ups,
       chat_id: chatId,
-      model: result.model
+      model: result.model,
+      liveMarketData: liveMarketData || undefined
     }), {
       status: 200,
       headers: CORS_HEADERS

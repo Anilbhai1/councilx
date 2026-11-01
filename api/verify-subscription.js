@@ -53,15 +53,10 @@ module.exports = async function handler(req, res) {
     const secret = process.env.RAZORPAY_KEY_SECRET;
 
     if (!secret || secret === 'your_razorpay_key_secret_here') {
-      console.warn('[CouncilX Razorpay Notice]: RAZORPAY_KEY_SECRET not configured. Development mode approval.');
-      return res.status(200).json({
-        success: true,
-        verified: true,
-        mode: 'development_fallback',
-        paymentId: razorpay_payment_id,
-        subscriptionId: razorpay_subscription_id || razorpay_order_id,
-        planId: plan_id,
-        message: 'Subscription confirmed in development mode.'
+      console.error('[CouncilX Razorpay Security Error]: RAZORPAY_KEY_SECRET is not configured in backend environment.');
+      return res.status(400).json({
+        success: false,
+        error: 'RAZORPAY_KEY_SECRET is not configured in backend environment (.env). Cryptographic verification cannot proceed.'
       });
     }
 

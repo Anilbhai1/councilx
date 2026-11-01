@@ -542,10 +542,10 @@ export default function PaywallModal({
                 <Text style={styles.gatewaySubtext}>Cards, UPI, NetBanking</Text>
 
                 {/* Verified payment badges for UPI, RuPay, Visa */}
-                <View style={styles.dummyIconsRow}>
-                  <View style={styles.dummyChip}><Text style={styles.dummyTextUPI}>UPI</Text></View>
-                  <View style={styles.dummyChip}><Text style={styles.dummyTextRuPay}>RuPay</Text></View>
-                  <View style={styles.dummyChip}><Text style={styles.dummyTextVisa}>VISA</Text></View>
+                <View style={styles.paymentBadgesRow}>
+                  <View style={styles.paymentBadgeChip}><Text style={styles.badgeTextUPI}>UPI</Text></View>
+                  <View style={styles.paymentBadgeChip}><Text style={styles.badgeTextRuPay}>RuPay</Text></View>
+                  <View style={styles.paymentBadgeChip}><Text style={styles.badgeTextVisa}>VISA</Text></View>
                 </View>
               </TouchableOpacity>
 
@@ -565,12 +565,12 @@ export default function PaywallModal({
                 </View>
                 <Text style={styles.payPalSubtext}>International Cards & PayPal</Text>
 
-                {/* Dummy icons for PayPal, Visa, Mastercard, Amex */}
-                <View style={styles.dummyIconsRow}>
-                  <View style={[styles.dummyChip, styles.payPalIconChip]}><Text style={styles.payPalChipText}>PayPal</Text></View>
-                  <View style={styles.dummyChip}><Text style={styles.dummyTextVisa}>VISA</Text></View>
-                  <View style={styles.dummyChip}><Text style={styles.dummyTextMC}>MC</Text></View>
-                  <View style={styles.dummyChip}><Text style={styles.dummyTextAmex}>AMEX</Text></View>
+                {/* Verified payment badges for PayPal, Visa, Mastercard, Amex */}
+                <View style={styles.paymentBadgesRow}>
+                  <View style={[styles.paymentBadgeChip, styles.payPalIconChip]}><Text style={styles.payPalChipText}>PayPal</Text></View>
+                  <View style={styles.paymentBadgeChip}><Text style={styles.badgeTextVisa}>VISA</Text></View>
+                  <View style={styles.paymentBadgeChip}><Text style={styles.badgeTextMC}>MC</Text></View>
+                  <View style={styles.paymentBadgeChip}><Text style={styles.badgeTextAmex}>AMEX</Text></View>
                 </View>
               </TouchableOpacity>
 
@@ -1011,12 +1011,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     opacity: 0.85,
   },
-  dummyIconsRow: {
+  paymentBadgesRow: {
     flexDirection: 'row',
     gap: 5,
     marginTop: 4,
   },
-  dummyChip: {
+  paymentBadgeChip: {
     backgroundColor: '#F1F5F9',
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -1024,27 +1024,27 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#CBD5E1',
   },
-  dummyTextUPI: {
+  badgeTextUPI: {
     color: '#10B981',
     fontSize: 8,
     fontWeight: '900',
   },
-  dummyTextRuPay: {
+  badgeTextRuPay: {
     color: '#EA580C',
     fontSize: 8,
     fontWeight: '900',
   },
-  dummyTextVisa: {
+  badgeTextVisa: {
     color: '#0284C7',
     fontSize: 8,
     fontWeight: '900',
   },
-  dummyTextMC: {
+  badgeTextMC: {
     color: '#DC2626',
     fontSize: 8,
     fontWeight: '900',
   },
-  dummyTextAmex: {
+  badgeTextAmex: {
     color: '#2563EB',
     fontSize: 8,
     fontWeight: '900',
