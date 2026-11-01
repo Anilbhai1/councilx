@@ -1,6 +1,10 @@
+export const runtime = 'edge';
+export const config = { runtime: 'edge' };
+
 /**
  * COUNCIL X | THE SYNDICATE
  * ORACLE OF WEALTH BACKEND ROUTE HANDLER
+ * Runtime: Edge Function (Exempt from Vercel Hobby 12 Serverless Function limit)
  * 
  * 1. REAL LIVE DATA INTEGRATION (yahoo-finance2)
  *    - Real-time stock quotes, financials, macro overview.
@@ -11,7 +15,17 @@
  *    - Full persona isolation & A-to-Z Masterclass doctrine.
  */
 
-const { getLiveFinancialContext, getLiveMarketOverview, getLiveStockQuote } = require('./finance');
+let financeModule = null;
+try {
+  financeModule = require('./_lib/finance');
+} catch (e) {
+  try {
+    financeModule = require('./finance');
+  } catch (e2) {}
+}
+const getLiveFinancialContext = financeModule?.getLiveFinancialContext || (async () => ({}));
+const getLiveMarketOverview = financeModule?.getLiveMarketOverview || (async () => ({}));
+const getLiveStockQuote = financeModule?.getLiveStockQuote || (async () => null);
 const chatHandler = require('./chat');
 
 module.exports = async function handler(req, res) {

@@ -17,8 +17,12 @@ export const maxDuration = 60;
 
 let getLiveFinancialContext = null;
 try {
-  getLiveFinancialContext = require('../../../api/finance').getLiveFinancialContext;
-} catch (e) {}
+  getLiveFinancialContext = (require('../../../api/_lib/finance') || require('../../../api/finance')).getLiveFinancialContext;
+} catch (e) {
+  try {
+    getLiveFinancialContext = require('../../../api/finance').getLiveFinancialContext;
+  } catch (e2) {}
+}
 
 /**
  * Helper to explicitly extract and trim API keys from Edge process.env, request headers, and client payload

@@ -3,16 +3,10 @@
  * Standalone Local Backend Server for Serverless Handlers
  * 
  * Runs on port 3001 (or process.env.PORT) to serve:
- * - POST /api/create-order
- * - POST /api/verify-payment
- * - POST /api/create-subscription
- * - POST /api/verify-subscription
- * - POST /api/chat
- * - POST /api/oracle
- * - POST /api/admin/login
- * - GET/POST /api/admin/users
- * - POST /api/admin/override
- * - GET/POST /api/admin/verify
+ * - /api/chat (Edge-compatible Chat Engine)
+ * - /api/oracle (Edge-compatible Financial Telemetry)
+ * - /api/admin/:action (Consolidated Admin Switch Route)
+ * - /api/payments/:action (Consolidated Razorpay Switch Route)
  * 
  * Uses built-in Node.js 'http' and 'fs' modules so zero extra dependencies are needed.
  */
@@ -40,16 +34,10 @@ if (fs.existsSync(envPath)) {
   });
 }
 
-const createOrderHandler = require('../api/create-order');
-const verifyPaymentHandler = require('../api/verify-payment');
-const createSubscriptionHandler = require('../api/create-subscription');
-const verifySubscriptionHandler = require('../api/verify-subscription');
 const chatHandler = require('../api/chat');
 const oracleHandler = require('../api/oracle');
-const adminLoginHandler = require('../api/admin/login');
-const adminUsersHandler = require('../api/admin/users');
-const adminOverrideHandler = require('../api/admin/override');
-const adminVerifyHandler = require('../api/admin/verify');
+const adminHandler = require('../api/admin/[action]');
+const paymentsHandler = require('../api/payments/[action]');
 
 const PORT = process.env.PORT || 3001;
 
@@ -78,11 +66,11 @@ const server = http.createServer((req, res) => {
     }
 
     // Helper functions for mock res object matching express/serverless
-    res.status = function(code) {
+    res.status = function (code) {
       res.statusCode = code;
       return res;
     };
-    res.json = function(data) {
+    res.json = function (data) {
       res.setHeader('Content-Type', 'application/json');
       res.end(JSON.stringify(data));
       return res;
@@ -90,6 +78,7 @@ const server = http.createServer((req, res) => {
 
     const url = (req.url || '').split('?')[0];
 
+    // 1. AI Chat & Oracle Routes (Edge-Compatible)
     if (url === '/api/chat' || url === '/api/gemini' || url === '/api/chat/route') {
       try {
         await chatHandler(req, res);
@@ -102,58 +91,48 @@ const server = http.createServer((req, res) => {
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }
-    } else if (url === '/api/create-order') {
+    }
+    // 2. Consolidated Admin Routes (/api/admin/:action)
+    else if (url.startsWith('/api/admin')) {
       try {
-        await createOrderHandler(req, res);
+        const action = url.replace('/api/admin/', '').replace('/api/admin', '').trim();
+        req.query = req.query || {};
+        if (action) req.query.action = action;
+        await adminHandler(req, res);
+      } catch (err) {
+        res.status(404).json({ error: 'Not Found' });
+      }
+    }
+    // 3. Consolidated Payments Routes (/api/payments/:action + legacy aliases)
+    else if (url.startsWith('/api/payments')) {
+      try {
+        const action = url.replace('/api/payments/', '').replace('/api/payments', '').trim();
+        req.query = req.query || {};
+        if (action) req.query.action = action;
+        await paymentsHandler(req, res);
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }
-    } else if (url === '/api/verify-payment') {
+    } else if (
+      url === '/api/create-order' ||
+      url === '/api/verify-payment' ||
+      url === '/api/create-subscription' ||
+      url === '/api/verify-subscription'
+    ) {
       try {
-        await verifyPaymentHandler(req, res);
+        const action = url.replace('/api/', '').trim();
+        req.query = req.query || {};
+        req.query.action = action;
+        await paymentsHandler(req, res);
       } catch (err) {
         res.status(500).json({ success: false, error: err.message });
       }
-    } else if (url === '/api/create-subscription') {
-      try {
-        await createSubscriptionHandler(req, res);
-      } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-      }
-    } else if (url === '/api/verify-subscription') {
-      try {
-        await verifySubscriptionHandler(req, res);
-      } catch (err) {
-        res.status(500).json({ success: false, error: err.message });
-      }
-    } else if (url === '/api/admin/login') {
-      try {
-        await adminLoginHandler(req, res);
-      } catch (err) {
-        res.status(404).json({ error: 'Cannot POST /api/admin/login' });
-      }
-    } else if (url === '/api/admin/users') {
-      try {
-        await adminUsersHandler(req, res);
-      } catch (err) {
-        res.status(404).json({ error: 'Cannot GET /api/admin/users' });
-      }
-    } else if (url === '/api/admin/override') {
-      try {
-        await adminOverrideHandler(req, res);
-      } catch (err) {
-        res.status(404).json({ error: 'Cannot POST /api/admin/override' });
-      }
-    } else if (url === '/api/admin/verify') {
-      try {
-        await adminVerifyHandler(req, res);
-      } catch (err) {
-        res.status(404).json({ error: 'Cannot GET /api/admin/verify' });
-      }
-    } else if (url === '/health' || url === '/') {
+    }
+    // 4. System Health & PWA Manifest
+    else if (url === '/health' || url === '/') {
       res.status(200).json({
         status: 'online',
-        service: 'CouncilX Backend Serverless Gateway',
+        service: 'CouncilX Backend Consolidated Gateway',
         adminAuthConfigured: Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD),
         razorpayKeyIdConfigured: Boolean(process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID),
         razorpaySecretConfigured: Boolean(process.env.RAZORPAY_KEY_SECRET && process.env.RAZORPAY_KEY_SECRET !== 'your_razorpay_key_secret_here')
@@ -184,7 +163,7 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`[CouncilX] Backend serverless gateway running at http://localhost:${PORT}`);
+  console.log(`[CouncilX] Backend consolidated gateway running at http://localhost:${PORT}`);
   console.log(`[CouncilX] Stealth Admin: ${process.env.ADMIN_EMAIL ? 'CONFIGURED' : 'PENDING'}`);
   console.log(`[CouncilX] Razorpay Key ID: ${process.env.EXPO_PUBLIC_RAZORPAY_KEY_ID || 'rzp_live_Tqty6gwfEY7eqC'}`);
   console.log(`[CouncilX] Secret Key Present: ${Boolean(process.env.RAZORPAY_KEY_SECRET)}`);

@@ -95,7 +95,7 @@ export default function AdminLoginScreen({ navigation, onLoginSuccess }) {
           try {
             window.sessionStorage.setItem('@councilx_admin_jwt', data.token);
             window.history.pushState(null, '', '/admin/dashboard');
-          } catch (e) {}
+          } catch (e) { }
         }
 
         if (onLoginSuccess) {
@@ -310,3 +310,4 @@ const styles = StyleSheet.create({
     fontFamily: Platform.select({ web: 'Courier, monospace', default: 'monospace' })
   }
 });
+

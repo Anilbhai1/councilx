@@ -169,7 +169,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
           if (!token && Platform.OS === 'web' && typeof window !== 'undefined') {
             token = window.sessionStorage.getItem('@councilx_admin_jwt');
           }
-        } catch (e) {}
+        } catch (e) { }
 
         if (screenName === 'AdminDashboard') {
           if (!token) {
@@ -237,7 +237,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
     logout: async () => {
       try {
         await clearLocalSession();
-      } catch (e) {}
+      } catch (e) { }
       setIsAuthenticated(false);
       setCurrentScreen('Auth');
       setScreenParams({});
@@ -323,7 +323,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
 
   if (!isAuthenticated) {
     return (
-      <AuthScreen 
+      <AuthScreen
         onAuthSuccess={() => {
           setIsAuthenticated(true);
           setCurrentScreen('Home');
@@ -370,12 +370,12 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
         );
       case 'Auth':
         return (
-          <AuthScreen 
+          <AuthScreen
             onAuthSuccess={() => {
               setIsAuthenticated(true);
               setCurrentScreen('Home');
               if (onAuthChange) onAuthChange(true);
-            }} 
+            }}
           />
         );
       case 'Chat':

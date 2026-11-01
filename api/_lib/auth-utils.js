@@ -163,3 +163,4 @@ module.exports = {
   send404,
   getJwtSecret
 };
+

@@ -1,6 +1,10 @@
+export const runtime = 'edge';
+export const config = { runtime: 'edge' };
+
 /**
  * COUNCIL X | THE SYNDICATE
  * MAX-POWER AGENTIC CHAT API BACKEND
+ * Runtime: Edge Function (Exempt from Vercel Hobby 12 Serverless Function limit)
  * 
  * 1. ZERO HARDCODED FALLBACKS:
  *    - All mock/static responses and static follow-up question candidate lists nuked.
@@ -25,8 +29,12 @@
 // Pure Web Standards & Edge compatible (fetch, Request, Response, JSON)
 let getLiveFinancialContext = null;
 try {
-  getLiveFinancialContext = require('./finance').getLiveFinancialContext;
-} catch (e) {}
+  getLiveFinancialContext = (require('./_lib/finance') || require('./finance')).getLiveFinancialContext;
+} catch (e) {
+  try {
+    getLiveFinancialContext = require('./finance').getLiveFinancialContext;
+  } catch (e2) {}
+}
 
 /**
  * Helper to explicitly extract and trim API keys from environment variables, request headers, and client payload

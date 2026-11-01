@@ -1211,7 +1211,7 @@ export const paymentService = {
 
   /**
    * Universal Order Creator for Razorpay Live Checkout
-   * Securely calls serverless /api/create-order endpoint to generate dynamic Razorpay orders
+   * Securely calls serverless /api/payments/create-order endpoint to generate dynamic Razorpay orders
    * NEVER returns hardcoded/mock order IDs that cause "Beneficiary UPI ID incorrect" / "random@razorpay" errors
    */
   async createRazorpayOrder({ amount, currency = 'INR', planId = '216_syndicate', planName = '' } = {}) {
@@ -1232,7 +1232,7 @@ export const paymentService = {
       if (typeof window !== 'undefined' && window.fetch) {
         let res;
         try {
-          res = await window.fetch(`${baseUrl}/api/create-order`, {
+          res = await window.fetch(`${baseUrl}/api/payments/create-order`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1244,7 +1244,7 @@ export const paymentService = {
           });
         } catch (fetchErr) {
           // Fallback to relative URL if local server port 3001 isn't running
-          res = await window.fetch('/api/create-order', {
+          res = await window.fetch('/api/payments/create-order', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1322,12 +1322,12 @@ export const paymentService = {
       }
     }
 
-    // 1. Try serverless endpoint /api/verify-payment
+    // 1. Try serverless endpoint /api/payments/verify-payment
     try {
       if (typeof window !== 'undefined' && window.fetch) {
         let res;
         try {
-          res = await window.fetch(`${baseUrl}/api/verify-payment`, {
+          res = await window.fetch(`${baseUrl}/api/payments/verify-payment`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1341,7 +1341,7 @@ export const paymentService = {
             })
           });
         } catch (fetchErr) {
-          res = await window.fetch('/api/verify-payment', {
+          res = await window.fetch('/api/payments/verify-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1458,7 +1458,7 @@ export const paymentService = {
 
   /**
    * Razorpay Subscriptions API Integration for Oracle of Wealth
-   * Generates recurring subscription via /api/create-subscription
+   * Generates recurring subscription via /api/payments/create-subscription
    */
   async createRazorpaySubscription({ planTier = 'MARKET_MASTER', userEmail = '', userPhone = '' } = {}) {
     const keyId = this.getRazorpayKey();
@@ -1477,7 +1477,7 @@ export const paymentService = {
       if (typeof window !== 'undefined' && window.fetch) {
         let res;
         try {
-          res = await window.fetch(`${baseUrl}/api/create-subscription`, {
+          res = await window.fetch(`${baseUrl}/api/payments/create-subscription`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1488,7 +1488,7 @@ export const paymentService = {
             })
           });
         } catch (fetchErr) {
-          res = await window.fetch('/api/create-subscription', {
+          res = await window.fetch('/api/payments/create-subscription', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1533,7 +1533,7 @@ export const paymentService = {
   },
 
   /**
-   * Verify Razorpay Recurring Subscription Signature via /api/verify-subscription
+   * Verify Razorpay Recurring Subscription Signature via /api/payments/verify-subscription
    */
   async verifyRazorpaySubscription({
     razorpay_payment_id,
@@ -1557,7 +1557,7 @@ export const paymentService = {
       if (typeof window !== 'undefined' && window.fetch) {
         let res;
         try {
-          res = await window.fetch(`${baseUrl}/api/verify-subscription`, {
+          res = await window.fetch(`${baseUrl}/api/payments/verify-subscription`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1570,7 +1570,7 @@ export const paymentService = {
             })
           });
         } catch (fetchErr) {
-          res = await window.fetch('/api/verify-subscription', {
+          res = await window.fetch('/api/payments/verify-subscription', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

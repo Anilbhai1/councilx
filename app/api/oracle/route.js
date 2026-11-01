@@ -1,9 +1,11 @@
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
  * COUNCIL X | THE SYNDICATE
  * Next.js App Router Dedicated Oracle of Wealth Route Handler (app/api/oracle/route.js)
+ * Runtime: Edge Function (Does not count against Vercel 12 Serverless Function limit)
  * 
  * 1. REAL LIVE DATA INTEGRATION (yahoo-finance2 & direct Yahoo v8)
  * 2. SAFE BACKEND API KEY INITIALIZATION:
@@ -31,7 +33,17 @@ export async function OPTIONS() {
  */
 export async function GET(request) {
   try {
-    const { getLiveFinancialContext, getLiveMarketOverview } = require('../../../api/finance');
+    let financeModule = null;
+    try {
+      financeModule = require('../../../api/_lib/finance');
+    } catch (e) {
+      try {
+        financeModule = require('../../../api/finance');
+      } catch (e2) {}
+    }
+    const getLiveFinancialContext = financeModule?.getLiveFinancialContext || (async () => ({}));
+    const getLiveMarketOverview = financeModule?.getLiveMarketOverview || (async () => ({}));
+
     const { searchParams } = new URL(request.url);
     const isOverview = searchParams.get('overview') === 'true';
     const ticker = searchParams.get('ticker') || searchParams.get('query') || searchParams.get('q') || '';

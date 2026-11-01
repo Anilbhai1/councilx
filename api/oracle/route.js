@@ -1,9 +1,11 @@
+export const runtime = 'edge';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 /**
  * COUNCIL X | THE SYNDICATE
  * Vercel Route Handler: /api/oracle/route.js
+ * Runtime: Edge Function (Exempt from Vercel Hobby 12 Serverless Function limit)
  */
 
 const CORS_HEADERS = {
@@ -22,7 +24,17 @@ export async function OPTIONS() {
 
 export async function GET(request) {
   try {
-    const { getLiveFinancialContext, getLiveMarketOverview } = require('../finance');
+    let financeModule = null;
+    try {
+      financeModule = require('../_lib/finance');
+    } catch (e) {
+      try {
+        financeModule = require('../finance');
+      } catch (e2) {}
+    }
+    const getLiveFinancialContext = financeModule?.getLiveFinancialContext || (async () => ({}));
+    const getLiveMarketOverview = financeModule?.getLiveMarketOverview || (async () => ({}));
+
     const { searchParams } = new URL(request.url);
     const isOverview = searchParams.get('overview') === 'true';
     const ticker = searchParams.get('ticker') || searchParams.get('query') || searchParams.get('q') || '';
