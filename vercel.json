@@ -1,7 +1,14 @@
 {
   "cleanUrls": true,
+  "installCommand": "npm install --legacy-peer-deps",
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/((?!api/|privacy-policy|terms-of-service|contact|admin).*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/$1"
+    },
+    {
+      "source": "/((?!api/|privacy-policy|terms-of-service|contact|admin).*)",
+      "destination": "/index.html"
+    }
   ]
 }
