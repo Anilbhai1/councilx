@@ -12,13 +12,12 @@ export const revalidate = 15;
 
 function getFinanceModule() {
   try {
-    return require('../../../api/_lib/finance');
+    const req = typeof (global as any).__non_webpack_require__ !== 'undefined'
+      ? (global as any).__non_webpack_require__
+      : require;
+    return req('../../../api/_lib/finance') || req('../../api/_lib/finance');
   } catch (e) {
-    try {
-      return require('../../api/_lib/finance');
-    } catch (e2) {
-      return null;
-    }
+    return null;
   }
 }
 

@@ -15,13 +15,15 @@ export const maxDuration = 60;
  * - Tavily: process.env.TAVILY_API_KEY
  */
 
-let getLiveFinancialContext = null;
-try {
-  getLiveFinancialContext = (require('../../../api/_lib/finance') || require('../../../api/finance')).getLiveFinancialContext;
-} catch (e) {
+function getLiveFinancialContext(userMessage, feature) {
   try {
-    getLiveFinancialContext = require('../../../api/finance').getLiveFinancialContext;
-  } catch (e2) { }
+    const req = typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : require;
+    const fin = req('../../../api/_lib/finance') || req('../../../api/finance');
+    if (fin && typeof fin.getLiveFinancialContext === 'function') {
+      return fin.getLiveFinancialContext(userMessage, feature);
+    }
+  } catch (e) { }
+  return null;
 }
 
 /**
@@ -911,10 +913,4 @@ export async function POST(request) {
       headers: CORS_HEADERS
     });
   }
-}
-
-export default async function handler(request) {
-  if (request.method === 'OPTIONS') return OPTIONS();
-  if (request.method === 'GET') return GET(request);
-  return POST(request);
 }

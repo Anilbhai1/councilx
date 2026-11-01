@@ -10,12 +10,13 @@ let YahooFinanceClass = null;
 let yfInstance = null;
 
 try {
-  YahooFinanceClass = require('yahoo-finance2').default || require('yahoo-finance2');
+  const req = typeof __non_webpack_require__ !== 'undefined' ? __non_webpack_require__ : require;
+  YahooFinanceClass = req('yahoo-finance2').default || req('yahoo-finance2');
   if (YahooFinanceClass) {
     yfInstance = new YahooFinanceClass({ suppressNotices: ['yahooSurvey'] });
   }
 } catch (e) {
-  console.warn('[Finance Service] yahoo-finance2 require notice (will use direct v8 fetch fallback):', e.message);
+  // Gracefully fallback to direct v8 chart fetch
 }
 
 // Canonical institutional mapping for instant high-speed resolution

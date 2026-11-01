@@ -58,7 +58,7 @@ export default function HomePage() {
             setTicker(data.ticker);
           }
         }
-      } catch (e) {}
+      } catch (e) { }
     };
     fetchTicker();
     const interval = setInterval(fetchTicker, 30000);
@@ -125,7 +125,7 @@ export default function HomePage() {
           const { done, value } = await reader.read();
           if (done) break;
           const chunk = decoder.decode(value, { stream: true });
-          
+
           // Parse lines
           const lines = chunk.split('\n');
           for (const line of lines) {
@@ -161,7 +161,7 @@ export default function HomePage() {
   const handleWatchAd = async () => {
     setRewardLoading(true);
     setRewardMessage('Broadcasting encrypted transmission... (5s)');
-    
+
     setTimeout(async () => {
       try {
         const token = `ad_claim_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -195,7 +195,7 @@ export default function HomePage() {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#050505', color: '#E0E0E0' }}>
-      
+
       {/* 1. Live Market Ticker */}
       <div style={{
         backgroundColor: '#0D0D0D',
@@ -304,7 +304,7 @@ export default function HomePage() {
 
       {/* 3. Hero & Oracle Section */}
       <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '32px 20px 80px' }}>
-        
+
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <h1 style={{ fontSize: '36px', fontWeight: 900, color: '#FFF', margin: '0 0 10px', letterSpacing: '-0.5px' }}>
             Oracle of Wealth & Mastermind Syndicate
@@ -440,3 +440,4 @@ export default function HomePage() {
     </div>
   );
 }
+
