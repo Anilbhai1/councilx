@@ -30,7 +30,51 @@ import { COLORS } from '../theme/colors';
 import { getLocalSession, clearLocalSession, getInitialAuthSync } from '../services/supabaseClient';
 
 export default function AppNavigator({ initialAuth, onAuthChange }) {
-  const [currentScreen, setCurrentScreen] = useState('Home');
+  const [currentScreen, setCurrentScreen] = useState(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const path = (window.location.pathname || '').toLowerCase();
+      const search = (window.location.search || '').toLowerCase();
+      const hash = (window.location.hash || '').toLowerCase();
+
+      // Check inner dashboard: requires token, else stealth 404
+      if (
+        path === '/admin/dashboard' ||
+        path.startsWith('/admin/dashboard') ||
+        search.includes('admin/dashboard') ||
+        hash.includes('admin/dashboard')
+      ) {
+        let token = null;
+        try {
+          token =
+            window.sessionStorage?.getItem('@councilx_admin_jwt') ||
+            window.localStorage?.getItem('@councilx_admin_jwt');
+        } catch (e) {}
+        return token ? 'AdminDashboard' : 'NotFound';
+      }
+
+      // /admin route MUST render the brutalist Login Screen normally (or dashboard if already logged in)
+      if (
+        path === '/admin' ||
+        path === '/admin/' ||
+        path.startsWith('/admin/login') ||
+        search.includes('admin') ||
+        hash.includes('admin')
+      ) {
+        let token = null;
+        try {
+          token =
+            window.sessionStorage?.getItem('@councilx_admin_jwt') ||
+            window.localStorage?.getItem('@councilx_admin_jwt');
+        } catch (e) {}
+        return token ? 'AdminDashboard' : 'AdminLogin';
+      }
+
+      if (path.startsWith('/pricing') || search.includes('pricing') || hash.includes('pricing')) return 'Pricing';
+      if (path.startsWith('/oracle') || search.includes('oracle') || hash.includes('oracle') || path.startsWith('/wealth')) return 'Oracle';
+      if (path.startsWith('/success') || search.includes('success') || hash.includes('success')) return 'PremiumSuccess';
+    }
+    return 'Home';
+  });
   const [screenParams, setScreenParams] = useState({});
   const [isAuthenticated, setIsAuthenticated] = useState(
     typeof initialAuth === 'boolean' ? initialAuth : getInitialAuthSync()
@@ -51,6 +95,9 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
             if (!token && typeof window !== 'undefined' && window.sessionStorage) {
               token = window.sessionStorage.getItem('@councilx_admin_jwt');
             }
+            if (!token && typeof window !== 'undefined' && window.localStorage) {
+              token = window.localStorage.getItem('@councilx_admin_jwt');
+            }
             return token;
           } catch (e) {
             return null;
@@ -66,7 +113,13 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
             // Stealth disguise: render 404 Page Not Found component
             setCurrentScreen('NotFound');
           }
-        } else if (path === '/admin' || path === '/admin/' || search.includes('admin') || hash.includes('admin')) {
+        } else if (
+          path === '/admin' ||
+          path === '/admin/' ||
+          path.startsWith('/admin/login') ||
+          search.includes('admin') ||
+          hash.includes('admin')
+        ) {
           // Accessing /admin root: if already authenticated, go to dashboard; else show brutalist login
           const token = await getAdminToken();
           if (token) {
@@ -246,7 +299,7 @@ export default function AppNavigator({ initialAuth, onAuthChange }) {
   };
 
   // Dedicated Stealth Admin Dashboard: Accessible when authenticated via JWT
-  if (currentScreen === 'AdminDashboard' || currentScreen === 'Admin') {
+  if (currentScreen === 'AdminDashboard') {
     return (
       <View style={styles.container}>
         <AdminDashboardScreen

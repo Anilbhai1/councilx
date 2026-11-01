@@ -168,6 +168,30 @@ const ORACLE_FEATURES = [
   }
 ];
 
+// Dynamic Razorpay Checkout SDK Script Loader
+const loadRazorpayScript = () => {
+  return new Promise((resolve) => {
+    if (typeof window === 'undefined') return resolve(false);
+    if (window.Razorpay) return resolve(true);
+
+    const existingScript = document.getElementById('razorpay-checkout-script');
+    if (existingScript) {
+      if (window.Razorpay) return resolve(true);
+      existingScript.addEventListener('load', () => resolve(true));
+      existingScript.addEventListener('error', () => resolve(false));
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.id = 'razorpay-checkout-script';
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.async = true;
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.body.appendChild(script);
+  });
+};
+
 export default function OracleOfWealthScreen({ navigation }) {
   const { lang, t } = useLanguage();
 
@@ -213,6 +237,9 @@ export default function OracleOfWealthScreen({ navigation }) {
   useEffect(() => {
     loadUserAndShadowStatus();
     loadMacroOverview();
+    if (Platform.OS === 'web') {
+      loadRazorpayScript();
+    }
     const interval = setInterval(loadMacroOverview, 35000);
     return () => clearInterval(interval);
   }, []);
@@ -424,89 +451,98 @@ export default function OracleOfWealthScreen({ navigation }) {
   };
 
   /**
-   * RAZORPAY SUBSCRIPTIONS API PAYMENT TRIGGER
+   * RAZORPAY ORDERS API PAYMENT TRIGGER (Oracle Upgrade)
    */
   const handleSubscribeRazorpay = async (planTier) => {
     setSelectedPlanTier(planTier);
     setSubscribing(true);
 
     try {
-      const subRes = await paymentService.createRazorpaySubscription({
-        planTier,
-        userEmail: userStatus.email || 'investor@councilx.ai',
-        userPhone: '9876543210'
+      // 1. Dynamically attach Razorpay checkout SDK if not yet loaded
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded || typeof window === 'undefined' || !window.Razorpay) {
+        throw new Error('Razorpay Checkout SDK could not be loaded. Please check your internet connection.');
+      }
+
+      const targetPlan = ORACLE_SUBSCRIPTION_PLANS[planTier] || ORACLE_SUBSCRIPTION_PLANS.MARKET_MASTER;
+      const amountInPaise = (targetPlan.price || 999) * 100;
+
+      // 2. Create order via backend API route (api/payment/create-order or api/payments/create-order)
+      const orderRes = await paymentService.createRazorpayOrder({
+        amount: amountInPaise,
+        currency: 'INR',
+        planId: planTier,
+        planName: targetPlan.name
       });
 
-      if (!subRes || !subRes.success) {
-        throw new Error(subRes?.error || 'Could not initiate Razorpay subscription.');
+      if (!orderRes || !orderRes.success || !orderRes.order_id) {
+        throw new Error(orderRes?.error || 'Could not initiate Razorpay order.');
       }
 
-      const keyId = subRes.key_id || 'rzp_live_Tqty6gwfEY7eqC';
-      const targetPlan = ORACLE_SUBSCRIPTION_PLANS[planTier] || ORACLE_SUBSCRIPTION_PLANS.MARKET_MASTER;
+      const keyId = orderRes.key_id || paymentService.getRazorpayKey();
 
-      if (typeof window !== 'undefined' && window.Razorpay) {
-        const options = {
-          key: keyId,
-          subscription_id: subRes.subscription_id,
-          name: 'Council X | Oracle of Wealth',
-          description: `${targetPlan.name} (Recurring Subscription)`,
-          image: 'https://councilx.ai/icon.png',
-          currency: 'INR',
-          handler: async function (response) {
-            try {
-              const verifyRes = await paymentService.verifyRazorpaySubscription({
-                razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_subscription_id: response.razorpay_subscription_id || subRes.subscription_id,
-                razorpay_order_id: response.razorpay_order_id,
-                razorpay_signature: response.razorpay_signature,
-                planTier
-              });
+      // 3. Open Razorpay checkout modal seamlessly
+      const options = {
+        key: keyId,
+        amount: orderRes.amount,
+        currency: orderRes.currency || 'INR',
+        name: 'Council X | Oracle of Wealth',
+        description: `${targetPlan.name} Access`,
+        image: 'https://councilx.ai/icon.png',
+        order_id: orderRes.order_id,
+        handler: async function (response) {
+          try {
+            const verifyRes = await paymentService.verifyRazorpayPayment({
+              razorpay_order_id: response.razorpay_order_id || orderRes.order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              planKeyOrType: planTier
+            });
 
-              if (verifyRes.success) {
-                setSubscriptionModalVisible(false);
-                await loadUserAndShadowStatus();
-                Alert.alert(
-                  'SUBSCRIPTION ACTIVATED',
-                  `Welcome to the ${targetPlan.name}. All 8 Oracle of Wealth engines and the 216 Masterminds are now fully unlocked for your account.`
-                );
-              } else {
-                Alert.alert('Verification Notice', 'Payment completed. Activating subscription via backend.');
-                await loadUserAndShadowStatus();
-              }
-            } catch (vErr) {
-              Alert.alert('Notice', 'Payment received. Updating your subscription status.');
+            if (verifyRes && verifyRes.success) {
+              setSubscriptionModalVisible(false);
               await loadUserAndShadowStatus();
-            } finally {
-              setSubscribing(false);
+              Alert.alert(
+                'ACCESS GRANTED',
+                `Welcome to ${targetPlan.name}. All 8 Oracle of Wealth engines and the 216 Masterminds are now fully unlocked for your account.`
+              );
+            } else {
+              setSubscriptionModalVisible(false);
+              await loadUserAndShadowStatus();
             }
-          },
-          prefill: {
-            name: userStatus.name || 'Council Member',
-            email: userStatus.email || 'investor@councilx.ai',
-            contact: '9876543210'
-          },
-          theme: {
-            color: '#D4AF37'
-          },
-          modal: {
-            ondismiss: function () {
-              setSubscribing(false);
-            }
+          } catch (vErr) {
+            console.error('[Payment Verification Notice]:', vErr);
+            setSubscriptionModalVisible(false);
+            await loadUserAndShadowStatus();
+          } finally {
+            setSubscribing(false);
           }
-        };
+        },
+        prefill: {
+          name: userStatus.name || 'Council Member',
+          email: userStatus.email || 'investor@councilx.ai',
+          contact: '9876543210'
+        },
+        theme: {
+          color: '#D4AF37'
+        },
+        modal: {
+          ondismiss: function () {
+            setSubscribing(false);
+          }
+        }
+      };
 
-        const rzp = new window.Razorpay(options);
-        rzp.open();
-      } else {
-        Alert.alert(
-          'Payment Gateway Initializing',
-          'Razorpay payment gateway checkout is initializing. Please ensure popups are allowed and click Subscribe again.'
-        );
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (resp) {
+        console.error('[Razorpay Payment Failed]:', resp.error);
+        Alert.alert('Payment Failed', resp.error?.description || 'Transaction could not be completed.');
         setSubscribing(false);
-      }
+      });
+      rzp.open();
     } catch (err) {
-      console.error('[Razorpay Subscription Trigger Error]:', err);
-      Alert.alert('Subscription Error', err.message || 'Unable to open Razorpay payment gateway.');
+      console.error('[Razorpay Order Trigger Error]:', err);
+      Alert.alert('Checkout Error', err.message || 'Unable to open Razorpay payment gateway.');
       setSubscribing(false);
     }
   };

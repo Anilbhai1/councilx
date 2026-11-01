@@ -1230,49 +1230,54 @@ export const paymentService = {
 
     try {
       if (typeof window !== 'undefined' && window.fetch) {
-        let res;
-        try {
-          res = await window.fetch(`${baseUrl}/api/payments/create-order`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: roundedAmount,
-              currency,
-              planId,
-              userId
-            })
-          });
-        } catch (fetchErr) {
-          // Fallback to relative URL if local server port 3001 isn't running
-          res = await window.fetch('/api/payments/create-order', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: roundedAmount,
-              currency,
-              planId,
-              userId
-            })
-          });
+        const candidateEndpoints = [
+          `${baseUrl}/api/payment/create-order`,
+          `${baseUrl}/api/payments/create-order`,
+          '/api/payment/create-order',
+          '/api/payments/create-order'
+        ].filter((v, i, a) => v && a.indexOf(v) === i);
+
+        let lastError = null;
+
+        for (const ep of candidateEndpoints) {
+          try {
+            const res = await window.fetch(ep, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: roundedAmount,
+                currency,
+                planId,
+                userId
+              })
+            });
+
+            if (res.ok) {
+              const data = await res.json();
+              if (data && (data.order_id || data.id)) {
+                const finalOrderId = data.order_id || data.id;
+                return {
+                  success: true,
+                  order_id: finalOrderId,
+                  id: finalOrderId,
+                  amount: data.amount || roundedAmount,
+                  currency: data.currency || currency,
+                  key_id: data.key_id || keyId
+                };
+              }
+            } else {
+              const errData = await res.json().catch(() => ({}));
+              lastError = new Error(errData?.error || `Server responded with ${res.status}`);
+            }
+          } catch (fetchErr) {
+            lastError = fetchErr;
+          }
         }
 
-        const data = await res.json();
-        if (res.ok && data && (data.order_id || data.id)) {
-          const finalOrderId = data.order_id || data.id;
-          return {
-            success: true,
-            order_id: finalOrderId,
-            id: finalOrderId,
-            amount: data.amount || roundedAmount,
-            currency: data.currency || currency,
-            key_id: keyId
-          };
-        } else {
-          return {
-            success: false,
-            error: data?.error || 'Failed to create order on Razorpay servers.'
-          };
-        }
+        return {
+          success: false,
+          error: lastError?.message || 'Failed to create order on Razorpay servers.'
+        };
       }
     } catch (err) {
       console.warn('[CouncilX Notice] Serverless create-order endpoint error:', err.message);

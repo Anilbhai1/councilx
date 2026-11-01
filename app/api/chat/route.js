@@ -21,7 +21,7 @@ try {
 } catch (e) {
   try {
     getLiveFinancialContext = require('../../../api/finance').getLiveFinancialContext;
-  } catch (e2) {}
+  } catch (e2) { }
 }
 
 /**
@@ -246,11 +246,11 @@ function buildMasterSystemPrompt(agent = {}, language = 'gu', liveSearchContext 
   const mode = options.mode || (feature ? 'oracle_of_wealth' : 'single');
   const reportContext = options.reportContext || '';
 
-  const isOracleOfWealth = mode === 'oracle_of_wealth' || 
-    Boolean(feature) || 
-    agent.category === 'Wealth' || 
-    agent.category === 'Stock Market' || 
-    agent.category === 'Finance' || 
+  const isOracleOfWealth = mode === 'oracle_of_wealth' ||
+    Boolean(feature) ||
+    agent.category === 'Wealth' ||
+    agent.category === 'Stock Market' ||
+    agent.category === 'Finance' ||
     agentName.toLowerCase().includes('oracle') ||
     agentName.toLowerCase().includes('wealth');
 
@@ -706,7 +706,7 @@ async function executeMaxPowerLLM({
             }
           }
         }
-      } catch (err) {}
+      } catch (err) { }
 
       // Try 2: without tools (standard JSON generation)
       try {
@@ -822,11 +822,11 @@ export async function POST(request) {
     const feature = body.feature || '';
     const reportContext = body.reportContext || '';
 
-    const isOracleOfWealth = mode === 'oracle_of_wealth' || 
-      Boolean(feature) || 
-      agent?.category === 'Wealth' || 
-      agent?.category === 'Stock Market' || 
-      agent?.category === 'Finance' || 
+    const isOracleOfWealth = mode === 'oracle_of_wealth' ||
+      Boolean(feature) ||
+      agent?.category === 'Wealth' ||
+      agent?.category === 'Stock Market' ||
+      agent?.category === 'Finance' ||
       (agent?.name || '').toLowerCase().includes('oracle') ||
       (agent?.name || '').toLowerCase().includes('wealth');
 
